@@ -6,6 +6,7 @@ from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarku
 
 from utils.context import AppContext
 from utils.helpers import compute_coef, format_user_name
+from utils.phrases import pick_phrase
 from utils.time_utils import parse_range, parse_time_str, pick_random_time, sleep_window_for_date, today_str
 
 
@@ -54,7 +55,7 @@ async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: b
             + day_stats.get("wins_sleepy", 0)
         )
         day_coef = compute_coef(day_wins_total, ctx.config)
-        ctx.db.settle_bets(group_id, "day", today, day_winner["user_id"], day_coef)
+        day_bets = ctx.db.settle_bets(group_id, "day", today, day_winner["user_id"], day_coef)
         ctx.db.record_win(group_id, day_winner["user_id"], "day", ctx.config["points_day"])
 
         day_name = format_user_name(
@@ -63,7 +64,34 @@ async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: b
             day_winner.get("first_name"),
             day_winner.get("last_name"),
         )
+        day_phrase = pick_phrase("day")
         day_caption = f"Дракон дня: {day_name}\n+{ctx.config['points_day']} очков"
+        if day_bets:
+            won_points = day_bets.get("won_points", 0)
+            lost_points = day_bets.get("lost_points", 0)
+            winners = day_bets.get("winning_bets", [])
+            lines = [
+                f"\nСтавки: +{won_points} / -{lost_points}",
+            ]
+            if winners:
+                lines.append("Первые 5 сыгравших:")
+                for bet in winners:
+                    bettor = ctx.db.get_user_identity(group_id, bet["user_id"]) or {
+                        "user_id": bet["user_id"],
+                        "username": None,
+                        "first_name": None,
+                        "last_name": None,
+                    }
+                    bettor_name = format_user_name(
+                        bettor["user_id"],
+                        bettor.get("username"),
+                        bettor.get("first_name"),
+                        bettor.get("last_name"),
+                    )
+                    lines.append(f"- {bettor_name}: {bet['amount']} -> {bet['payout']}")
+            day_caption = f"{day_caption}\n" + "\n".join(lines)
+        if day_phrase:
+            day_caption = f"{day_caption}\n\n{day_phrase}"
         await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["day"]), caption=day_caption)
 
     if evil_winner and send_evil:
@@ -74,7 +102,7 @@ async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: b
             + evil_stats.get("wins_sleepy", 0)
         )
         evil_coef = compute_coef(evil_wins_total, ctx.config)
-        ctx.db.settle_bets(group_id, "evil", today, evil_winner["user_id"], evil_coef)
+        evil_bets = ctx.db.settle_bets(group_id, "evil", today, evil_winner["user_id"], evil_coef)
         ctx.db.record_win(group_id, evil_winner["user_id"], "evil", ctx.config["points_evil"])
         evil_name = format_user_name(
             evil_winner["user_id"],
@@ -82,7 +110,34 @@ async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: b
             evil_winner.get("first_name"),
             evil_winner.get("last_name"),
         )
+        evil_phrase = pick_phrase("evil")
         evil_caption = f"Злой дракон: {evil_name}\n{ctx.config['points_evil']} очков"
+        if evil_bets:
+            won_points = evil_bets.get("won_points", 0)
+            lost_points = evil_bets.get("lost_points", 0)
+            winners = evil_bets.get("winning_bets", [])
+            lines = [
+                f"\nСтавки: +{won_points} / -{lost_points}",
+            ]
+            if winners:
+                lines.append("Первые 5 сыгравших:")
+                for bet in winners:
+                    bettor = ctx.db.get_user_identity(group_id, bet["user_id"]) or {
+                        "user_id": bet["user_id"],
+                        "username": None,
+                        "first_name": None,
+                        "last_name": None,
+                    }
+                    bettor_name = format_user_name(
+                        bettor["user_id"],
+                        bettor.get("username"),
+                        bettor.get("first_name"),
+                        bettor.get("last_name"),
+                    )
+                    lines.append(f"- {bettor_name}: {bet['amount']} -> {bet['payout']}")
+            evil_caption = f"{evil_caption}\n" + "\n".join(lines)
+        if evil_phrase:
+            evil_caption = f"{evil_caption}\n\n{evil_phrase}"
         await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["evil"]), caption=evil_caption)
 
     ctx.db.set_group_state(
@@ -106,6 +161,11 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
     )
     ctx.db.create_sleep_event(group_id, sleep_date, close_at.isoformat(), msg.message_id)
     await asyncio.sleep(join_minutes * 60)
+    try:
+        await ctx.bot.delete_message(group_id, msg.message_id)
+    except Exception:
+        pass
+    ctx.db.delete_sleep_event(group_id, sleep_date)
 
     entries = ctx.db.get_sleep_entries(group_id, sleep_date)
     if not entries:
@@ -132,7 +192,10 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
         winner_stats.get("first_name"),
         winner_stats.get("last_name"),
     )
+    sleepy_phrase = pick_phrase("sleepy")
     caption = f"Сонный дракон: {winner_name}\n+{ctx.config['points_sleepy']} очков"
+    if sleepy_phrase:
+        caption = f"{caption}\n\n{sleepy_phrase}"
     await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["sleepy"]), caption=caption)
     ctx.db.clear_sleep_entries(group_id, sleep_date)
 

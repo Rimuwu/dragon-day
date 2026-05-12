@@ -151,6 +151,19 @@ class Database:
                 stat.first_name = first_name
                 stat.last_name = last_name
 
+    def sync_user(self, group_id: int, user_id: int, username: str | None, first_name: str | None, last_name: str | None) -> None:
+        with self._session() as session:
+            stat = session.get(Stat, (group_id, user_id))
+            if stat is not None:
+                stat.username = username
+                stat.first_name = first_name
+                stat.last_name = last_name
+            participant = session.get(Participant, (group_id, user_id))
+            if participant is not None:
+                participant.username = username
+                participant.first_name = first_name
+                participant.last_name = last_name
+
     def add_participant(
         self,
         group_id: int,
@@ -426,7 +439,14 @@ class Database:
                 stat.points += int(total)
         return int(total)
 
-    def settle_bets(self, group_id: int, bet_type: str, bet_date: str, winner_id: int | None, coef: float) -> None:
+    def settle_bets(
+        self,
+        group_id: int,
+        bet_type: str,
+        bet_date: str,
+        winner_id: int | None,
+        coef: float,
+    ) -> dict:
         with self._session() as session:
             bets = session.execute(
                 select(Bet).where(
@@ -436,6 +456,10 @@ class Database:
                     Bet.settled == 0,
                 )
             ).scalars().all()
+
+            won_points = 0
+            lost_points = 0
+            winning_bets = []
 
             for bet in bets:
                 stat = session.get(Stat, (group_id, bet.user_id))
@@ -447,11 +471,26 @@ class Database:
                     stat.points += payout
                     stat.bets_played += 1
                     stat.bets_won += 1
+                    won_points += payout
+                    winning_bets.append(
+                        {
+                            "user_id": bet.user_id,
+                            "amount": bet.amount,
+                            "payout": payout,
+                        }
+                    )
                 else:
                     stat.bets_played += 1
+                    lost_points += bet.amount
 
             for bet in bets:
                 bet.settled = 1
+
+        return {
+            "won_points": won_points,
+            "lost_points": lost_points,
+            "winning_bets": winning_bets[:5],
+        }
 
     def count_open_bets(self, group_id: int, user_id: int, bet_date: str) -> int:
         with self._session() as session:
@@ -479,6 +518,15 @@ class Database:
             else:
                 event.closes_at = closes_at
                 event.message_id = message_id
+
+    def delete_sleep_event(self, group_id: int, sleep_date: str) -> None:
+        with self._session() as session:
+            session.execute(
+                delete(SleepEvent).where(
+                    SleepEvent.group_id == group_id,
+                    SleepEvent.sleep_date == sleep_date,
+                )
+            )
 
     def get_sleep_event(self, group_id: int, sleep_date: str) -> dict | None:
         with self._session() as session:

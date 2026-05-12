@@ -18,6 +18,13 @@ def get_router(ctx: AppContext) -> Router:
             return
         if not await ensure_supported_group(ctx, message):
             return
+        ctx.db.sync_user(
+            message.chat.id,
+            message.from_user.id,
+            message.from_user.username,
+            message.from_user.first_name,
+            message.from_user.last_name,
+        )
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="Участвовать", callback_data=f"join:{message.chat.id}")]
@@ -36,6 +43,7 @@ def get_router(ctx: AppContext) -> Router:
             return
         user = callback.from_user
         if ctx.db.is_participant(group_id, user.id):
+            ctx.db.sync_user(group_id, user.id, user.username, user.first_name, user.last_name)
             await callback.answer("Вы уже зарегистрированы.")
             return
         ctx.db.add_participant(

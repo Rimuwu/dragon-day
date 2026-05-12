@@ -17,6 +17,13 @@ def get_router(ctx: AppContext) -> Router:
             return
         if not await ensure_supported_group(ctx, message):
             return
+        ctx.db.sync_user(
+            message.chat.id,
+            message.from_user.id,
+            message.from_user.username,
+            message.from_user.first_name,
+            message.from_user.last_name,
+        )
         stats = ctx.db.get_user_stats(message.chat.id, message.from_user.id)
         if not stats:
             await message.answer("Профиль пуст. Участвуйте в событиях, чтобы появились данные.")

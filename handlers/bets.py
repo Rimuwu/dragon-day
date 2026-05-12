@@ -104,6 +104,13 @@ def get_router(ctx: AppContext) -> Router:
             message.from_user.first_name,
             message.from_user.last_name,
         )
+        ctx.db.sync_user(
+            message.chat.id,
+            message.from_user.id,
+            message.from_user.username,
+            message.from_user.first_name,
+            message.from_user.last_name,
+        )
         await send_bet_menu(message, message.chat.id, message.from_user.id, "day", 0)
 
     @router.message(Command("bet_evil"))
@@ -114,6 +121,13 @@ def get_router(ctx: AppContext) -> Router:
         if not await ensure_supported_group(ctx, message):
             return
         ctx.db.upsert_user(
+            message.chat.id,
+            message.from_user.id,
+            message.from_user.username,
+            message.from_user.first_name,
+            message.from_user.last_name,
+        )
+        ctx.db.sync_user(
             message.chat.id,
             message.from_user.id,
             message.from_user.username,
@@ -137,6 +151,13 @@ def get_router(ctx: AppContext) -> Router:
             return
         if not await ensure_supported_group(ctx, callback):
             return
+        ctx.db.sync_user(
+            group_id,
+            owner_id,
+            callback.from_user.username,
+            callback.from_user.first_name,
+            callback.from_user.last_name,
+        )
         await send_bet_menu(callback, group_id, owner_id, bet_type, page)
         await callback.answer()
 
@@ -156,6 +177,13 @@ def get_router(ctx: AppContext) -> Router:
             return
         if not await ensure_supported_group(ctx, callback):
             return
+        ctx.db.sync_user(
+            group_id,
+            owner_id,
+            callback.from_user.username,
+            callback.from_user.first_name,
+            callback.from_user.last_name,
+        )
         target = ctx.db.get_user_identity(group_id, target_id)
         if not target:
             await callback.answer("Игрок не найден.")
@@ -314,6 +342,13 @@ def get_router(ctx: AppContext) -> Router:
             callback.from_user.first_name,
             callback.from_user.last_name,
         )
+        ctx.db.sync_user(
+            group_id,
+            owner_id,
+            callback.from_user.username,
+            callback.from_user.first_name,
+            callback.from_user.last_name,
+        )
         bet_date = today_str(ctx.tz)
         current_amount = ctx.db.get_bet_amounts(group_id, owner_id, bet_type, bet_date).get(target_id, 0)
         delta = desired_amount - current_amount
@@ -354,6 +389,13 @@ def get_router(ctx: AppContext) -> Router:
             return
         if not await ensure_supported_group(ctx, message):
             return
+        ctx.db.sync_user(
+            message.chat.id,
+            message.from_user.id,
+            message.from_user.username,
+            message.from_user.first_name,
+            message.from_user.last_name,
+        )
         bet_date = today_str(ctx.tz)
         bets = ctx.db.list_active_bets(message.chat.id, message.from_user.id, bet_date)
         if not bets:
