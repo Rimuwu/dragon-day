@@ -1,0 +1,21 @@
+{
+  "timezone": "Europe/Moscow",
+  "db_path": "dragon_day.db",
+  "daily_time_default": "10:00",
+  "sleep_start_default": "23:00",
+  "sleep_end_default": "02:00",
+  "sleep_join_minutes": 10,
+  "points_day": 100,
+  "points_evil": -50,
+  "points_sleepy": 120,
+  "bet_step": 10,
+  "bet_coef_new": 2.0,
+  "bet_coef_min": 1.1,
+  "bet_coef_max": 1.5,
+  "bet_coef_decay": 0.05,
+  "images": {
+    "day": "images/happy-1.png",
+    "evil": "images/evil-1.png",
+    "sleepy": "images/sleepy-1.png"
+  }
+}

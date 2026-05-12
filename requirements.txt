@@ -1,0 +1,4 @@
+aiogram==3.28.2
+python-dotenv==1.2.2
+SQLAlchemy==2.0.30
+pydantic==2.7.1
