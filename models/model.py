@@ -84,3 +84,12 @@ class SleepEntry(Base):
     group_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, primary_key=True)
     sleep_date = Column(String(16), primary_key=True)
+
+
+class MessageCleanup(Base):
+    __tablename__ = "message_cleanups"
+
+    group_id = Column(Integer, primary_key=True)
+    chat_id = Column(Integer, primary_key=True)
+    message_id = Column(Integer, primary_key=True)
+    created_at = Column(String(64), nullable=False)

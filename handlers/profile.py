@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -40,6 +42,12 @@ def get_router(ctx: AppContext) -> Router:
             f"Не сыгравшие ставки: {bets_lost}\n"
             f"Открытые ставки сегодня: {open_bets}"
         )
-        await message.answer(text)
+        sent = await message.answer(text)
+        ctx.db.register_message_for_cleanup(
+            message.chat.id,
+            sent.chat.id,
+            sent.message_id,
+            datetime.now().isoformat(),
+        )
 
     return router

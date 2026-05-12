@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import BotCommand, BotCommandScopeChat, Message
@@ -59,6 +61,12 @@ def get_router(ctx: AppContext) -> Router:
             _build_commands(),
             scope=BotCommandScopeChat(chat_id=message.chat.id),
         )
-        await message.answer(_build_help_text())
+        sent = await message.answer(_build_help_text())
+        ctx.db.register_message_for_cleanup(
+            message.chat.id,
+            sent.chat.id,
+            sent.message_id,
+            datetime.now().isoformat(),
+        )
 
     return router

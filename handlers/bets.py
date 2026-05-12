@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -27,8 +29,20 @@ def get_router(ctx: AppContext) -> Router:
             text = f"Ставка на {bet_title(bet_type)}\n\nПока нет участников."
             if isinstance(target, CallbackQuery):
                 await target.message.edit_text(text)
+                ctx.db.register_message_for_cleanup(
+                    group_id,
+                    target.message.chat.id,
+                    target.message.message_id,
+                    datetime.now().isoformat(),
+                )
             else:
-                await target.answer(text)
+                sent = await target.answer(text)
+                ctx.db.register_message_for_cleanup(
+                    group_id,
+                    sent.chat.id,
+                    sent.message_id,
+                    datetime.now().isoformat(),
+                )
             return
 
         offset = page * PAGE_SIZE
@@ -53,6 +67,7 @@ def get_router(ctx: AppContext) -> Router:
         text = "\n".join(lines)
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
+        row: list[InlineKeyboardButton] = []
         for person in page_items:
             name = format_user_name(
                 person["user_id"],
@@ -60,14 +75,17 @@ def get_router(ctx: AppContext) -> Router:
                 person.get("first_name"),
                 person.get("last_name"),
             )
-            keyboard.inline_keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        text=f"Выбрать {name}",
-                        callback_data=f"betpick:{group_id}:{owner_id}:{bet_type}:{person['user_id']}:{page}",
-                    )
-                ]
+            row.append(
+                InlineKeyboardButton(
+                    text=f"{name} ({person['username']})",
+                    callback_data=f"betpick:{group_id}:{owner_id}:{bet_type}:{person['user_id']}:{page}",
+                )
             )
+            if len(row) == 2:
+                keyboard.inline_keyboard.append(row)
+                row = []
+        if row:
+            keyboard.inline_keyboard.append(row)
         nav = []
         if page > 0:
             nav.append(
@@ -85,10 +103,23 @@ def get_router(ctx: AppContext) -> Router:
             )
         if nav:
             keyboard.inline_keyboard.append(nav)
+
         if isinstance(target, CallbackQuery):
             await target.message.edit_text(text, reply_markup=keyboard)
+            ctx.db.register_message_for_cleanup(
+                group_id,
+                target.message.chat.id,
+                target.message.message_id,
+                datetime.now().isoformat(),
+            )
         else:
-            await target.answer(text, reply_markup=keyboard)
+            sent = await target.answer(text, reply_markup=keyboard)
+            ctx.db.register_message_for_cleanup(
+                group_id,
+                sent.chat.id,
+                sent.message_id,
+                datetime.now().isoformat(),
+            )
 
     @router.message(Command("bet_day"))
     async def cmd_bet_day(message: Message) -> None:
@@ -240,6 +271,12 @@ def get_router(ctx: AppContext) -> Router:
             ]
         )
         await callback.message.edit_text(text, reply_markup=keyboard)
+        ctx.db.register_message_for_cleanup(
+            group_id,
+            callback.message.chat.id,
+            callback.message.message_id,
+            datetime.now().isoformat(),
+        )
         await callback.answer()
 
     @router.callback_query(F.data.startswith("betamount:"))
@@ -316,6 +353,12 @@ def get_router(ctx: AppContext) -> Router:
             ]
         )
         await callback.message.edit_text(text, reply_markup=keyboard)
+        ctx.db.register_message_for_cleanup(
+            group_id,
+            callback.message.chat.id,
+            callback.message.message_id,
+            datetime.now().isoformat(),
+        )
         await callback.answer()
 
     @router.callback_query(F.data.startswith("betapply:"))

@@ -8,6 +8,7 @@ from models.model import (
     Bet,
     GroupSettings,
     GroupState,
+    MessageCleanup,
     Participant,
     SleepEntry,
     SleepEvent,
@@ -559,3 +560,55 @@ class Database:
                     SleepEntry.sleep_date == sleep_date,
                 )
             )
+
+    def register_message_for_cleanup(
+        self, group_id: int, chat_id: int, message_id: int, created_at: str
+    ) -> None:
+        with self._session() as session:
+            existing = session.get(
+                MessageCleanup,
+                (group_id, chat_id, message_id),
+            )
+            if existing is None:
+                session.add(
+                    MessageCleanup(
+                        group_id=group_id,
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        created_at=created_at,
+                    )
+                )
+
+    def get_stale_messages(self, timeout_seconds: int) -> list[dict]:
+        from datetime import datetime
+
+        with self._session() as session:
+            rows = session.execute(select(MessageCleanup)).all()
+        result = []
+        now = datetime.now()
+        for (row,) in rows:
+            try:
+                created = datetime.fromisoformat(row.created_at)
+                age = (now - created).total_seconds()
+                if age > timeout_seconds:
+                    result.append(
+                        {
+                            "group_id": row.group_id,
+                            "chat_id": row.chat_id,
+                            "message_id": row.message_id,
+                        }
+                    )
+            except ValueError:
+                pass
+        return result
+
+    def delete_cleanup_record(self, group_id: int, chat_id: int, message_id: int) -> None:
+        with self._session() as session:
+            session.execute(
+                delete(MessageCleanup).where(
+                    MessageCleanup.group_id == group_id,
+                    MessageCleanup.chat_id == chat_id,
+                    MessageCleanup.message_id == message_id,
+                )
+            )
+

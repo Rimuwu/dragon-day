@@ -263,5 +263,34 @@ async def scheduler_loop(ctx: AppContext) -> None:
         await asyncio.sleep(30)
 
 
+async def cleanup_loop(ctx: AppContext) -> None:
+    while True:
+        try:
+            timeout = ctx.config.get("cleanup_message_timeout", 3600)
+            stale = ctx.db.get_stale_messages(timeout)
+            for msg_info in stale:
+                try:
+                    await ctx.bot.edit_message_text(
+                        text="Это сообщение устарело, воспользуйтесь командой заново.",
+                        chat_id=msg_info["chat_id"],
+                        message_id=msg_info["message_id"],
+                        reply_markup=None
+                    )
+                except Exception:
+                    pass
+                try:
+                    ctx.db.delete_cleanup_record(
+                        msg_info["group_id"],
+                        msg_info["chat_id"],
+                        msg_info["message_id"],
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        await asyncio.sleep(30)
+
+
 async def start_scheduler(ctx: AppContext) -> None:
     asyncio.create_task(scheduler_loop(ctx))
+    asyncio.create_task(cleanup_loop(ctx))

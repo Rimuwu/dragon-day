@@ -5,6 +5,7 @@
   "sleep_start_default": "23:00",
   "sleep_end_default": "02:00",
   "sleep_join_minutes": 10,
+  "cleanup_message_timeout": 3600,
   "points_day": 100,
   "points_evil": -50,
   "points_sleepy": 120,

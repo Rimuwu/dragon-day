@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, Message
@@ -27,8 +29,20 @@ def get_router(ctx: AppContext) -> Router:
         keyboard = build_leaderboard_keyboard(group_id, owner_id, kind, page, total, PAGE_SIZE)
         if isinstance(target, CallbackQuery):
             await target.message.edit_text(text, reply_markup=keyboard)
+            ctx.db.register_message_for_cleanup(
+                group_id,
+                target.message.chat.id,
+                target.message.message_id,
+                datetime.now().isoformat(),
+            )
         else:
-            await target.answer(text, reply_markup=keyboard)
+            sent = await target.answer(text, reply_markup=keyboard)
+            ctx.db.register_message_for_cleanup(
+                group_id,
+                sent.chat.id,
+                sent.message_id,
+                datetime.now().isoformat(),
+            )
 
     @router.message(Command("leaderboard"))
     async def cmd_leaderboard(message: Message, command: CommandObject) -> None:
