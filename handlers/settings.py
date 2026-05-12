@@ -10,7 +10,7 @@ from utils.time_utils import parse_range, parse_time_str
 def get_router(ctx: AppContext) -> Router:
     router = Router()
 
-    @router.message(Command("set-time"))
+    @router.message(Command("set_time"))
     async def cmd_set_time(message: Message, command: CommandObject) -> None:
         if not ensure_group_message(message):
             await message.answer("Команда доступна только в группах.")
@@ -22,7 +22,7 @@ def get_router(ctx: AppContext) -> Router:
             return
         args = (command.args or "").strip()
         if not args:
-            await message.answer("Укажите время в формате HH:MM, например /set-time 10:00.")
+            await message.answer("Укажите время в формате HH:MM, например /set_time 10:00.")
             return
         try:
             parse_time_str(args)
@@ -32,7 +32,7 @@ def get_router(ctx: AppContext) -> Router:
         ctx.db.set_group_time(message.chat.id, args, ctx.config)
         await message.answer(f"Время ежедневного топа установлено на {args} (МСК).")
 
-    @router.message(Command("sleep-time"))
+    @router.message(Command("sleep_time"))
     async def cmd_sleep_time(message: Message, command: CommandObject) -> None:
         if not ensure_group_message(message):
             await message.answer("Команда доступна только в группах.")
@@ -44,7 +44,7 @@ def get_router(ctx: AppContext) -> Router:
             return
         args = (command.args or "").strip()
         if not args:
-            await message.answer("Укажите диапазон HH:MM-HH:MM, например /sleep-time 23:00-02:00.")
+            await message.answer("Укажите диапазон HH:MM-HH:MM, например /sleep_time 23:00-02:00.")
             return
         try:
             start_time, end_time = parse_range(args)

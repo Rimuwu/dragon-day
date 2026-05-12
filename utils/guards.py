@@ -16,7 +16,7 @@ async def ensure_admin(message: Message) -> bool:
 async def ensure_supported_group(ctx: AppContext, target: Message | CallbackQuery) -> bool:
     chat = target.message.chat if isinstance(target, CallbackQuery) else target.chat
     if not ctx.db.is_group_allowed(chat.id):
-        text = "Группа не поддерживается. Попросите администратора бота добавить /add-group."
+        text = "Группа не поддерживается. Попросите администратора бота добавить /add_group."
         if isinstance(target, CallbackQuery):
             await target.answer(text, show_alert=True)
         else:

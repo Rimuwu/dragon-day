@@ -29,7 +29,10 @@ async def _pick_valid_member(ctx: AppContext, group_id: int, candidates: list[di
     return None
 
 
-async def process_daily(ctx: AppContext, group_id: int) -> None:
+async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: bool, send_evil: bool) -> None:
+    today = today_str(ctx.tz)
+    if not send_day and not send_evil:
+        return
     participants = ctx.db.list_participants(group_id)
     if not participants:
         await ctx.bot.send_message(group_id, "Сегодня нет участников для выбора драконов.")
@@ -43,26 +46,27 @@ async def process_daily(ctx: AppContext, group_id: int) -> None:
     remaining = [p for p in participants if p["user_id"] != day_winner["user_id"]]
     evil_winner = await _pick_valid_member(ctx, group_id, remaining) if remaining else day_winner
 
-    day_stats = ctx.db.get_user_stats(group_id, day_winner["user_id"]) or {}
-    day_wins_total = (
-        day_stats.get("wins_day", 0)
-        + day_stats.get("wins_evil", 0)
-        + day_stats.get("wins_sleepy", 0)
-    )
-    day_coef = compute_coef(day_wins_total, ctx.config)
-    ctx.db.settle_bets(group_id, "day", today_str(ctx.tz), day_winner["user_id"], day_coef)
-    ctx.db.record_win(group_id, day_winner["user_id"], "day", ctx.config["points_day"])
+    if send_day:
+        day_stats = ctx.db.get_user_stats(group_id, day_winner["user_id"]) or {}
+        day_wins_total = (
+            day_stats.get("wins_day", 0)
+            + day_stats.get("wins_evil", 0)
+            + day_stats.get("wins_sleepy", 0)
+        )
+        day_coef = compute_coef(day_wins_total, ctx.config)
+        ctx.db.settle_bets(group_id, "day", today, day_winner["user_id"], day_coef)
+        ctx.db.record_win(group_id, day_winner["user_id"], "day", ctx.config["points_day"])
 
-    day_name = format_user_name(
-        day_winner["user_id"],
-        day_winner.get("username"),
-        day_winner.get("first_name"),
-        day_winner.get("last_name"),
-    )
-    day_caption = f"Дракон дня: {day_name}\n+{ctx.config['points_day']} очков"
-    await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["day"]), caption=day_caption)
+        day_name = format_user_name(
+            day_winner["user_id"],
+            day_winner.get("username"),
+            day_winner.get("first_name"),
+            day_winner.get("last_name"),
+        )
+        day_caption = f"Дракон дня: {day_name}\n+{ctx.config['points_day']} очков"
+        await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["day"]), caption=day_caption)
 
-    if evil_winner:
+    if evil_winner and send_evil:
         evil_stats = ctx.db.get_user_stats(group_id, evil_winner["user_id"]) or {}
         evil_wins_total = (
             evil_stats.get("wins_day", 0)
@@ -70,7 +74,7 @@ async def process_daily(ctx: AppContext, group_id: int) -> None:
             + evil_stats.get("wins_sleepy", 0)
         )
         evil_coef = compute_coef(evil_wins_total, ctx.config)
-        ctx.db.settle_bets(group_id, "evil", today_str(ctx.tz), evil_winner["user_id"], evil_coef)
+        ctx.db.settle_bets(group_id, "evil", today, evil_winner["user_id"], evil_coef)
         ctx.db.record_win(group_id, evil_winner["user_id"], "evil", ctx.config["points_evil"])
         evil_name = format_user_name(
             evil_winner["user_id"],
@@ -80,6 +84,15 @@ async def process_daily(ctx: AppContext, group_id: int) -> None:
         )
         evil_caption = f"Злой дракон: {evil_name}\n{ctx.config['points_evil']} очков"
         await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["evil"]), caption=evil_caption)
+
+    ctx.db.set_group_state(
+        group_id,
+        today if send_day else state["last_daily_date"],
+        today if send_evil else state["last_evil_date"],
+        state["last_sleepy_date"],
+        state["next_sleepy_at"],
+        ctx.config,
+    )
 
 
 async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> None:
@@ -134,16 +147,18 @@ async def scheduler_loop(ctx: AppContext) -> None:
             daily_time = parse_time_str(settings["daily_time"])
             daily_dt = datetime.combine(now.date(), daily_time, tzinfo=ctx.tz)
 
-            if now >= daily_dt and state["last_daily_date"] != today:
+            send_day = state["last_daily_date"] != today
+            send_evil = state["last_evil_date"] != today
+            if now >= daily_dt and (send_day or send_evil):
                 ctx.db.set_group_state(
                     group_id,
-                    today,
-                    today,
+                    today if send_day else state["last_daily_date"],
+                    today if send_evil else state["last_evil_date"],
                     state["last_sleepy_date"],
                     state["next_sleepy_at"],
                     ctx.config,
                 )
-                asyncio.create_task(process_daily(ctx, group_id))
+                asyncio.create_task(process_daily(ctx, group_id, state, send_day, send_evil))
 
             next_sleepy_raw = state["next_sleepy_at"]
             next_sleepy_at = None

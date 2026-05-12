@@ -179,6 +179,10 @@ class Database:
                 row.joined_at = joined_at
         self.upsert_user(group_id, user_id, username, first_name, last_name)
 
+    def is_participant(self, group_id: int, user_id: int) -> bool:
+        with self._session() as session:
+            return session.get(Participant, (group_id, user_id)) is not None
+
     def remove_participant(self, group_id: int, user_id: int) -> None:
         with self._session() as session:
             session.execute(
@@ -225,6 +229,26 @@ class Database:
             "first_name": row.first_name,
             "last_name": row.last_name,
         }
+
+    def get_user_identity(self, group_id: int, user_id: int) -> dict | None:
+        with self._session() as session:
+            stat = session.get(Stat, (group_id, user_id))
+            if stat:
+                return {
+                    "user_id": stat.user_id,
+                    "username": stat.username,
+                    "first_name": stat.first_name,
+                    "last_name": stat.last_name,
+                }
+            participant = session.get(Participant, (group_id, user_id))
+            if participant:
+                return {
+                    "user_id": participant.user_id,
+                    "username": participant.username,
+                    "first_name": participant.first_name,
+                    "last_name": participant.last_name,
+                }
+        return None
 
     def adjust_points(self, group_id: int, user_id: int, delta: int) -> None:
         with self._session() as session:
@@ -306,6 +330,26 @@ class Database:
                 )
             ).all()
         return {row[0]: row[1] for row in rows}
+
+    def list_active_bets(self, group_id: int, user_id: int, bet_date: str) -> list[dict]:
+        with self._session() as session:
+            rows = session.execute(
+                select(Bet).where(
+                    Bet.group_id == group_id,
+                    Bet.user_id == user_id,
+                    Bet.bet_date == bet_date,
+                    Bet.settled == 0,
+                )
+            ).scalars().all()
+        return [
+            {
+                "bet_type": row.bet_type,
+                "target_user_id": row.target_user_id,
+                "amount": row.amount,
+                "bet_date": row.bet_date,
+            }
+            for row in rows
+        ]
 
     def adjust_bet(
         self,

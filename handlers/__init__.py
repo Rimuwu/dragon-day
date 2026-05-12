@@ -6,6 +6,7 @@ from handlers.participants import get_router as participants_router
 from handlers.profile import get_router as profile_router
 from handlers.settings import get_router as settings_router
 from handlers.sleepy import get_router as sleepy_router
+from handlers.start import get_router as start_router
 
 
 def get_routers(ctx):
@@ -18,4 +19,5 @@ def get_routers(ctx):
         bets_router(ctx),
         profile_router(ctx),
         sleepy_router(ctx),
+        start_router(ctx),
     ]

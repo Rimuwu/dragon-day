@@ -35,6 +35,9 @@ def get_router(ctx: AppContext) -> Router:
         if not await ensure_supported_group(ctx, callback):
             return
         user = callback.from_user
+        if ctx.db.is_participant(group_id, user.id):
+            await callback.answer("Вы уже зарегистрированы.")
+            return
         ctx.db.add_participant(
             group_id,
             user.id,

@@ -11,7 +11,7 @@ from utils.guards import ensure_group_message
 def get_router(ctx: AppContext) -> Router:
     router = Router()
 
-    @router.message(Command("add-group"))
+    @router.message(Command("add_group"))
     async def cmd_add_group(message: Message) -> None:
         if not ensure_group_message(message):
             await message.answer("Команда доступна только в группах.")

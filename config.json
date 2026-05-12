@@ -4,7 +4,7 @@
   "daily_time_default": "10:00",
   "sleep_start_default": "23:00",
   "sleep_end_default": "02:00",
-  "sleep_join_minutes": 10,
+  "sleep_join_minutes": 1,
   "points_day": 100,
   "points_evil": -50,
   "points_sleepy": 120,

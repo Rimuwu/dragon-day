@@ -39,7 +39,7 @@ class Stat(Base):
     username = Column(String(64))
     first_name = Column(String(128))
     last_name = Column(String(128))
-    points = Column(Integer, nullable=False, default=0)
+    points = Column(Integer, nullable=False, default=100)
     wins_day = Column(Integer, nullable=False, default=0)
     wins_evil = Column(Integer, nullable=False, default=0)
     wins_sleepy = Column(Integer, nullable=False, default=0)
