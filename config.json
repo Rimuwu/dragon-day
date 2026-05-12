@@ -1,6 +1,6 @@
 {
   "timezone": "Europe/Moscow",
-  "db_path": "dragon_day.db",
+  "db_path": "data/dragon_day.db",
   "daily_time_default": "10:00",
   "sleep_start_default": "23:00",
   "sleep_end_default": "02:00",

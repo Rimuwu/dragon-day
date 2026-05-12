@@ -1,8 +1,9 @@
 services:
-  dragon-day-bot:
+
+  bot:
     build: .
     env_file:
       - .env
     volumes:
-      - ./dragon_day.db:/app/dragon_day.db
+      - ./data:/app/data
     restart: unless-stopped
