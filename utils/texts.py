@@ -56,7 +56,7 @@ def build_bet_text(
     for idx, person in enumerate(participants, start=start_index):
         name = format_user_name(
             person["user_id"],
-            person.get("username"),
+            None,
             person.get("first_name"),
             person.get("last_name"),
         )

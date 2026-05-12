@@ -42,7 +42,7 @@ def get_router(ctx: AppContext) -> Router:
         for idx, person in enumerate(page_items, start=start_index):
             name = format_user_name(
                 person["user_id"],
-                person.get("username"),
+                None,
                 person.get("first_name"),
                 person.get("last_name"),
             )
@@ -56,7 +56,7 @@ def get_router(ctx: AppContext) -> Router:
         for person in page_items:
             name = format_user_name(
                 person["user_id"],
-                person.get("username"),
+                None,
                 person.get("first_name"),
                 person.get("last_name"),
             )
@@ -190,7 +190,7 @@ def get_router(ctx: AppContext) -> Router:
             return
         name = format_user_name(
             target_id,
-            target.get("username"),
+            None,
             target.get("first_name"),
             target.get("last_name"),
         )
@@ -267,7 +267,7 @@ def get_router(ctx: AppContext) -> Router:
             return
         name = format_user_name(
             target_id,
-            target.get("username"),
+            None,
             target.get("first_name"),
             target.get("last_name"),
         )
@@ -411,7 +411,7 @@ def get_router(ctx: AppContext) -> Router:
             }
             name = format_user_name(
                 target["user_id"],
-                target.get("username"),
+                None,
                 target.get("first_name"),
                 target.get("last_name"),
             )

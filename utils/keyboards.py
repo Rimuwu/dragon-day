@@ -22,7 +22,7 @@ def build_leaderboard_keyboard(
     if page + 1 < total_pages:
         builder.add(
             InlineKeyboardButton(
-                text="Вперед",
+                text="Вперёд",
                 callback_data=f"lb:{group_id}:{owner_id}:{kind}:{page + 1}",
             )
         )
@@ -66,7 +66,7 @@ def build_bet_keyboard(
     if page + 1 < total_pages:
         nav.append(
             InlineKeyboardButton(
-                text="Вперед",
+                text="Вперёд",
                 callback_data=f"betpage:{group_id}:{owner_id}:{bet_type}:{page + 1}",
             )
         )
