@@ -19,7 +19,7 @@ def build_leaderboard_text(kind: str, entries: list[dict], page: int, total: int
     for idx, entry in enumerate(entries, start=start_index):
         name = format_user_name(
             entry["user_id"],
-            entry.get("username"),
+            None,
             entry.get("first_name"),
             entry.get("last_name"),
         )

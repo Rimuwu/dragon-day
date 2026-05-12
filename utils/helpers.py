@@ -1,4 +1,9 @@
-def format_user_name(user_id: int, username: str | None, first_name: str | None, last_name: str | None) -> str:
+
+def format_user_name(user_id: int, 
+                     username: str | None, 
+                     first_name: str | None, 
+                     last_name: str | None
+                     ) -> str:
     if username:
         return f"@{username}"
     name_parts = [part for part in [first_name, last_name] if part]
