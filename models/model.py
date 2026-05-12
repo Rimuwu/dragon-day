@@ -52,6 +52,7 @@ class GroupState(Base):
 
     group_id = Column(Integer, primary_key=True)
     last_daily_date = Column(String(16))
+    last_evil_date = Column(String(16))
     last_sleepy_date = Column(String(16))
     next_sleepy_at = Column(String(64))
 

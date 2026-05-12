@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 
 from models.db import Base, build_engine, build_session_factory
 from models.model import (
@@ -34,6 +34,14 @@ class Database:
 
     def init(self) -> None:
         Base.metadata.create_all(bind=self.engine)
+        self._ensure_group_state_columns()
+
+    def _ensure_group_state_columns(self) -> None:
+        with self.engine.begin() as conn:
+            rows = conn.execute(text("PRAGMA table_info(group_state)")).fetchall()
+            columns = {row[1] for row in rows}
+            if "last_evil_date" not in columns:
+                conn.execute(text("ALTER TABLE group_state ADD COLUMN last_evil_date TEXT"))
 
     def ensure_group(self, group_id: int, defaults: dict) -> None:
         with self._session() as session:
@@ -95,6 +103,7 @@ class Database:
         self,
         group_id: int,
         last_daily_date: str | None,
+        last_evil_date: str | None,
         last_sleepy_date: str | None,
         next_sleepy_at: str | None,
         defaults: dict,
@@ -103,6 +112,7 @@ class Database:
         with self._session() as session:
             row = session.get(GroupState, group_id)
             row.last_daily_date = last_daily_date
+            row.last_evil_date = last_evil_date
             row.last_sleepy_date = last_sleepy_date
             row.next_sleepy_at = next_sleepy_at
 
@@ -112,6 +122,7 @@ class Database:
             row = session.get(GroupState, group_id)
         return {
             "last_daily_date": row.last_daily_date,
+            "last_evil_date": row.last_evil_date,
             "last_sleepy_date": row.last_sleepy_date,
             "next_sleepy_at": row.next_sleepy_at,
         }

@@ -135,7 +135,14 @@ async def scheduler_loop(ctx: AppContext) -> None:
             daily_dt = datetime.combine(now.date(), daily_time, tzinfo=ctx.tz)
 
             if now >= daily_dt and state["last_daily_date"] != today:
-                ctx.db.set_group_state(group_id, today, state["last_sleepy_date"], state["next_sleepy_at"], ctx.config)
+                ctx.db.set_group_state(
+                    group_id,
+                    today,
+                    today,
+                    state["last_sleepy_date"],
+                    state["next_sleepy_at"],
+                    ctx.config,
+                )
                 asyncio.create_task(process_daily(ctx, group_id))
 
             next_sleepy_raw = state["next_sleepy_at"]
@@ -157,13 +164,21 @@ async def scheduler_loop(ctx: AppContext) -> None:
                 ctx.db.set_group_state(
                     group_id,
                     state["last_daily_date"],
+                    state["last_evil_date"],
                     state["last_sleepy_date"],
                     next_sleepy_at.isoformat(),
                     ctx.config,
                 )
 
             if next_sleepy_at and now >= next_sleepy_at and state["last_sleepy_date"] != today:
-                ctx.db.set_group_state(group_id, state["last_daily_date"], today, None, ctx.config)
+                ctx.db.set_group_state(
+                    group_id,
+                    state["last_daily_date"],
+                    state["last_evil_date"],
+                    today,
+                    None,
+                    ctx.config,
+                )
                 sleep_date = next_sleepy_at.date().isoformat()
                 asyncio.create_task(process_sleepy(ctx, group_id, sleep_date))
 
