@@ -12,3 +12,4 @@ class AppContext:
     tz: ZoneInfo
     db: Database
     bot: Bot
+    admin_id: int

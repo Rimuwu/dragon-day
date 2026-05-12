@@ -3,7 +3,16 @@ from contextlib import contextmanager
 from sqlalchemy import delete, func, select
 
 from models.db import Base, build_engine, build_session_factory
-from models.model import Bet, GroupSettings, GroupState, Participant, SleepEntry, SleepEvent, Stat
+from models.model import (
+    AllowedGroup,
+    Bet,
+    GroupSettings,
+    GroupState,
+    Participant,
+    SleepEntry,
+    SleepEvent,
+    Stat,
+)
 
 
 class Database:
@@ -41,9 +50,22 @@ class Database:
             if state is None:
                 session.add(GroupState(group_id=group_id))
 
+    def is_group_allowed(self, group_id: int) -> bool:
+        with self._session() as session:
+            return session.get(AllowedGroup, group_id) is not None
+
+    def allow_group(self, group_id: int, added_by: int, added_at: str, defaults: dict) -> bool:
+        with self._session() as session:
+            existing = session.get(AllowedGroup, group_id)
+            if existing is not None:
+                return False
+            session.add(AllowedGroup(group_id=group_id, added_by=added_by, added_at=added_at))
+        self.ensure_group(group_id, defaults)
+        return True
+
     def get_groups(self) -> list[int]:
         with self._session() as session:
-            rows = session.execute(select(GroupSettings.group_id)).all()
+            rows = session.execute(select(AllowedGroup.group_id)).all()
         return [row[0] for row in rows]
 
     def get_group_settings(self, group_id: int, defaults: dict) -> dict:
