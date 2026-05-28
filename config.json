@@ -14,6 +14,14 @@
   "bet_coef_min": 1.5,
   "bet_coef_max": 2.5,
   "bet_coef_decay": 0.05,
+  "dice_points": {
+    "1": 0,
+    "2": 5,
+    "3": 25,
+    "4": 50,
+    "5": 75,
+    "6": 100
+  },
   "images": {
     "day": "images/happy-1.png",
     "evil": "images/evil-1.png",

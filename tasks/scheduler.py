@@ -3,10 +3,11 @@ import random
 from datetime import datetime, timedelta
 
 from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup
-from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError, TelegramRetryAfter
 
 from utils.context import AppContext
 from utils.helpers import compute_coef, format_user_name
+from utils.caption import build_dragon_caption
+from utils.member import pick_valid_member
 from utils.phrases import pick_phrase
 from utils.time_utils import parse_range, parse_time_str, pick_random_time, sleep_window_for_date, today_str
 
@@ -19,31 +20,6 @@ def _build_sleep_keyboard(group_id: int, sleep_date: str) -> InlineKeyboardMarku
     )
 
 
-async def _pick_valid_member(ctx: AppContext, group_id: int, candidates: list[dict]) -> dict | None:
-    if not candidates:
-        return None
-    shuffled = candidates[:]
-    random.shuffle(shuffled)
-    for person in shuffled:
-        try:
-            member = await ctx.bot.get_chat_member(group_id, person["user_id"])
-        except TelegramBadRequest as e:
-            msg = str(e)
-            if "PARTICIPANT_ID_INVALID" in msg or "USER_ID_INVALID" in msg or "user not found" in msg.lower():
-                try:
-                    ctx.db.remove_participant(group_id, person["user_id"])
-                except Exception:
-                    pass
-                continue
-            else:
-                continue
-        except (TelegramNetworkError, TelegramRetryAfter, Exception):
-            continue
-        if member.status not in ("left", "kicked"):
-            return person
-    return None
-
-
 async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: bool, send_evil: bool) -> None:
     today = today_str(ctx.tz)
     if not send_day and not send_evil:
@@ -53,13 +29,13 @@ async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: b
         await ctx.bot.send_message(group_id, "Сегодня нет участников для выбора драконов.")
         return
 
-    day_winner = await _pick_valid_member(ctx, group_id, participants)
+    day_winner = await pick_valid_member(ctx, group_id, participants)
     if not day_winner:
         await ctx.bot.send_message(group_id, "Нет доступных участников в группе.")
         return
 
     remaining = [p for p in participants if p["user_id"] != day_winner["user_id"]]
-    evil_winner = await _pick_valid_member(ctx, group_id, remaining) if remaining else day_winner
+    evil_winner = await pick_valid_member(ctx, group_id, remaining) if remaining else day_winner
 
     if send_day:
         day_stats = ctx.db.get_user_stats(group_id, day_winner["user_id"]) or {}
@@ -72,40 +48,7 @@ async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: b
         day_bets = ctx.db.settle_bets(group_id, "day", today, day_winner["user_id"], day_coef)
         ctx.db.record_win(group_id, day_winner["user_id"], "day", ctx.config["points_day"])
 
-        day_name = format_user_name(
-            day_winner["user_id"],
-            day_winner.get("username"),
-            day_winner.get("first_name"),
-            day_winner.get("last_name"),
-        )
-        day_phrase = pick_phrase("day")
-        day_caption = f"Дракон дня: {day_name}\n+{ctx.config['points_day']} очков"
-        if day_bets:
-            won_points = day_bets.get("won_points", 0)
-            lost_points = day_bets.get("lost_points", 0)
-            winners = day_bets.get("winning_bets", [])
-            lines = [
-                f"\nСтавки: +{won_points} / -{lost_points}",
-            ]
-            if winners:
-                lines.append("Первые 5 сыгравших:")
-                for bet in winners:
-                    bettor = ctx.db.get_user_identity(group_id, bet["user_id"]) or {
-                        "user_id": bet["user_id"],
-                        "username": None,
-                        "first_name": None,
-                        "last_name": None,
-                    }
-                    bettor_name = format_user_name(
-                        bettor["user_id"],
-                        bettor.get("username"),
-                        bettor.get("first_name"),
-                        bettor.get("last_name"),
-                    )
-                    lines.append(f"- {bettor_name}: {bet['amount']} -> {bet['payout']}")
-            day_caption = f"{day_caption}\n" + "\n".join(lines)
-        if day_phrase:
-            day_caption = f"{day_caption}\n\n{day_phrase}"
+        day_caption = await build_dragon_caption(ctx, group_id, day_winner, "day", ctx.config["points_day"], day_bets)
         await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["day"]), caption=day_caption)
 
     if evil_winner and send_evil:
@@ -118,40 +61,8 @@ async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: b
         evil_coef = compute_coef(evil_wins_total, ctx.config)
         evil_bets = ctx.db.settle_bets(group_id, "evil", today, evil_winner["user_id"], evil_coef)
         ctx.db.record_win(group_id, evil_winner["user_id"], "evil", ctx.config["points_evil"])
-        evil_name = format_user_name(
-            evil_winner["user_id"],
-            evil_winner.get("username"),
-            evil_winner.get("first_name"),
-            evil_winner.get("last_name"),
-        )
-        evil_phrase = pick_phrase("evil")
-        evil_caption = f"Злой дракон: {evil_name}\n{ctx.config['points_evil']} очков"
-        if evil_bets:
-            won_points = evil_bets.get("won_points", 0)
-            lost_points = evil_bets.get("lost_points", 0)
-            winners = evil_bets.get("winning_bets", [])
-            lines = [
-                f"\nСтавки: +{won_points} / -{lost_points}",
-            ]
-            if winners:
-                lines.append("Первые 5 сыгравших:")
-                for bet in winners:
-                    bettor = ctx.db.get_user_identity(group_id, bet["user_id"]) or {
-                        "user_id": bet["user_id"],
-                        "username": None,
-                        "first_name": None,
-                        "last_name": None,
-                    }
-                    bettor_name = format_user_name(
-                        bettor["user_id"],
-                        bettor.get("username"),
-                        bettor.get("first_name"),
-                        bettor.get("last_name"),
-                    )
-                    lines.append(f"- {bettor_name}: {bet['amount']} -> {bet['payout']}")
-            evil_caption = f"{evil_caption}\n" + "\n".join(lines)
-        if evil_phrase:
-            evil_caption = f"{evil_caption}\n\n{evil_phrase}"
+
+        evil_caption = await build_dragon_caption(ctx, group_id, evil_winner, "evil", ctx.config["points_evil"], evil_bets)
         await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["evil"]), caption=evil_caption)
 
     ctx.db.set_group_state(
@@ -200,16 +111,13 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
 
     ctx.db.record_win(group_id, winner_id, "sleepy", ctx.config["points_sleepy"])
     winner_stats = ctx.db.get_user_stats(group_id, winner_id) or {}
-    winner_name = format_user_name(
-        winner_id,
-        winner_stats.get("username"),
-        winner_stats.get("first_name"),
-        winner_stats.get("last_name"),
-    )
-    sleepy_phrase = pick_phrase("sleepy")
-    caption = f"Сонный дракон: {winner_name}\n+{ctx.config['points_sleepy']} очков"
-    if sleepy_phrase:
-        caption = f"{caption}\n\n{sleepy_phrase}"
+    winner_dict = {
+        "user_id": winner_id,
+        "username": winner_stats.get("username"),
+        "first_name": winner_stats.get("first_name"),
+        "last_name": winner_stats.get("last_name"),
+    }
+    caption = await build_dragon_caption(ctx, group_id, winner_dict, "sleepy", ctx.config["points_sleepy"])
     await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["sleepy"]), caption=caption)
     ctx.db.clear_sleep_entries(group_id, sleep_date)
 

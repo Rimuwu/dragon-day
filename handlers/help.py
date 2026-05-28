@@ -12,6 +12,7 @@ def _build_commands() -> list[BotCommand]:
     return [
         BotCommand(command="help", description="Список команд и настройка кнопок"),
         BotCommand(command="add_group", description="Добавить группу (админ бота)"),
+        BotCommand(command="repick", description="Переиграть дракона (админ бота)"),
         BotCommand(command="points", description="Изменить очки (админ бота)"),
         BotCommand(command="enter", description="Вступить в список участников"),
         BotCommand(command="leave", description="Покинуть список участников"),
@@ -23,6 +24,7 @@ def _build_commands() -> list[BotCommand]:
         BotCommand(command="cancel_day", description="Отменить ставки на дракона дня"),
         BotCommand(command="cancel_evil", description="Отменить ставки на злого дракона"),
         BotCommand(command="my_bets", description="Мои активные ставки"),
+        BotCommand(command="roll", description="Кубик для очков (1 раз в день)"),
         BotCommand(command="me", description="Профиль игрока")
     ]
 
@@ -31,6 +33,7 @@ def _build_help_text() -> str:
     return (
         "Команды бота:\n"
         "/add_group — добавить группу (только админ бота)\n"
+        "/repick <day|evil> — переиграть дракона (только админ бота)\n"
         "/points — изменить очки (только админ бота)\n"
         "/enter — вступить в список участников\n"
         "/leave — выйти из списка участников\n"
@@ -42,6 +45,7 @@ def _build_help_text() -> str:
         "/cancel_day — отмена ставок на дракона дня\n"
         "/cancel_evil — отмена ставок на злого дракона\n"
         "/my_bets — активные ставки\n"
+        "/roll — кубик для получения очков (1 раз в день)\n"
         "/me — ваш профиль\n\n"
         "Эта команда также обновляет кнопки команд в группе."
     )

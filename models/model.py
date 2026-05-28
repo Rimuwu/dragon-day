@@ -86,6 +86,14 @@ class SleepEntry(Base):
     sleep_date = Column(String(16), primary_key=True)
 
 
+class Roll(Base):
+    __tablename__ = "rolls"
+
+    group_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, primary_key=True)
+    roll_date = Column(String(16), primary_key=True)
+
+
 class MessageCleanup(Base):
     __tablename__ = "message_cleanups"
 

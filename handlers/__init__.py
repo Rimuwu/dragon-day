@@ -1,4 +1,5 @@
 from handlers.admin import get_router as admin_router
+from handlers.dice import get_router as dice_router
 from handlers.help import get_router as help_router
 from handlers.bets import get_router as bets_router
 from handlers.leaderboard import get_router as leaderboard_router
@@ -12,6 +13,7 @@ from handlers.start import get_router as start_router
 def get_routers(ctx):
     return [
         admin_router(ctx),
+        dice_router(ctx),
         help_router(ctx),
         participants_router(ctx),
         leaderboard_router(ctx),

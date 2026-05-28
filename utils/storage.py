@@ -10,6 +10,7 @@ from models.model import (
     GroupState,
     MessageCleanup,
     Participant,
+    Roll,
     SleepEntry,
     SleepEvent,
     Stat,
@@ -612,3 +613,17 @@ class Database:
                 )
             )
 
+    def check_roll_used(self, group_id: int, user_id: int, roll_date: str) -> bool:
+        with self._session() as session:
+            row = session.get(Roll, (group_id, user_id, roll_date))
+        return row is not None
+
+    def record_roll(self, group_id: int, user_id: int, roll_date: str) -> None:
+        with self._session() as session:
+            row = session.get(Roll, (group_id, user_id, roll_date))
+            if row is None:
+                session.add(Roll(
+                    group_id=group_id,
+                    user_id=user_id,
+                    roll_date=roll_date,
+                ))
