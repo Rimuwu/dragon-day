@@ -14,6 +14,8 @@ def _build_commands() -> list[BotCommand]:
         BotCommand(command="add_group", description="Добавить группу (админ бота)"),
         BotCommand(command="repick", description="Переиграть дракона (админ бота)"),
         BotCommand(command="points", description="Изменить очки (админ бота)"),
+        BotCommand(command="set_points", description="Настроить очки драконов группы"),
+        BotCommand(command="group_settings", description="Показать настройки группы"),
         BotCommand(command="enter", description="Вступить в список участников"),
         BotCommand(command="leave", description="Покинуть список участников"),
         BotCommand(command="leaderboard", description="Топы дня/злых/сонных/очков"),
@@ -35,6 +37,8 @@ def _build_help_text() -> str:
         "/add_group — добавить группу (только админ бота)\n"
         "/repick <day|evil> — переиграть дракона (только админ бота)\n"
         "/points — изменить очки (только админ бота)\n"
+        "/set_points <day> <evil> <sleepy> — настроить очки драконов группы\n"
+        "/group_settings — показать настройки группы и текущее состояние\n"
         "/enter — вступить в список участников\n"
         "/leave — выйти из списка участников\n"
         "/leaderboard [day|evil|sleepy|points] — топ по категориям\n"

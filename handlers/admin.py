@@ -20,6 +20,8 @@ def get_router(ctx: AppContext) -> Router:
         if not ensure_group_message(message):
             await message.answer("Команда доступна только в группах.")
             return
+        if message.from_user is None:
+            return
         if message.from_user.id != ctx.admin_id:
             await message.answer("Команда доступна только администратору бота.")
             return
@@ -41,6 +43,8 @@ def get_router(ctx: AppContext) -> Router:
             return
         if not await ensure_supported_group(ctx, message):
             return
+        if message.from_user is None:
+            return
         if message.from_user.id != ctx.admin_id:
             await message.answer("Команда доступна только администратору бота.")
             return
@@ -48,7 +52,7 @@ def get_router(ctx: AppContext) -> Router:
         if len(args) < 2:
             await message.answer("Использование: /points <delta> (ответом на сообщение) или /points <user_id> <delta>.")
             return
-        if message.reply_to_message and len(args) == 2:
+        if message.reply_to_message and message.reply_to_message.from_user and len(args) == 2:
             target_id = message.reply_to_message.from_user.id
             delta_raw = args[1]
         elif len(args) >= 3:
@@ -71,6 +75,8 @@ def get_router(ctx: AppContext) -> Router:
             await message.answer("Команда доступна только в группах.")
             return
         if not await ensure_supported_group(ctx, message):
+            return
+        if message.from_user is None:
             return
         if message.from_user.id != ctx.admin_id:
             await message.answer("Команда доступна только администратору бота.")
@@ -99,7 +105,8 @@ def get_router(ctx: AppContext) -> Router:
         coef = compute_coef(wins_total, ctx.config)
         bets_result = ctx.db.settle_bets(message.chat.id, bet_type, today, winner["user_id"], coef)
         
-        points = ctx.config["points_day"] if bet_type == "day" else ctx.config["points_evil"]
+        group_settings = ctx.db.get_group_settings(message.chat.id, ctx.config)
+        points = group_settings["points_day"] if bet_type == "day" else group_settings["points_evil"]
         ctx.db.record_win(message.chat.id, winner["user_id"], bet_type, points)
         
         caption = await build_dragon_caption(ctx, message.chat.id, winner, bet_type, points, bets_result)

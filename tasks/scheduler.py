@@ -5,10 +5,9 @@ from datetime import datetime, timedelta
 from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup
 
 from utils.context import AppContext
-from utils.helpers import compute_coef, format_user_name
+from utils.helpers import compute_coef
 from utils.caption import build_dragon_caption
 from utils.member import pick_valid_member
-from utils.phrases import pick_phrase
 from utils.time_utils import parse_range, parse_time_str, pick_random_time, sleep_window_for_date, today_str
 
 
@@ -20,7 +19,14 @@ def _build_sleep_keyboard(group_id: int, sleep_date: str) -> InlineKeyboardMarku
     )
 
 
-async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: bool, send_evil: bool) -> None:
+async def process_daily(
+    ctx: AppContext,
+    group_id: int,
+    settings: dict,
+    state: dict,
+    send_day: bool,
+    send_evil: bool,
+) -> None:
     today = today_str(ctx.tz)
     if not send_day and not send_evil:
         return
@@ -46,9 +52,9 @@ async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: b
         )
         day_coef = compute_coef(day_wins_total, ctx.config)
         day_bets = ctx.db.settle_bets(group_id, "day", today, day_winner["user_id"], day_coef)
-        ctx.db.record_win(group_id, day_winner["user_id"], "day", ctx.config["points_day"])
+        ctx.db.record_win(group_id, day_winner["user_id"], "day", settings["points_day"])
 
-        day_caption = await build_dragon_caption(ctx, group_id, day_winner, "day", ctx.config["points_day"], day_bets)
+        day_caption = await build_dragon_caption(ctx, group_id, day_winner, "day", settings["points_day"], day_bets)
         await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["day"]), caption=day_caption)
 
     if evil_winner and send_evil:
@@ -60,9 +66,9 @@ async def process_daily(ctx: AppContext, group_id: int, state: dict, send_day: b
         )
         evil_coef = compute_coef(evil_wins_total, ctx.config)
         evil_bets = ctx.db.settle_bets(group_id, "evil", today, evil_winner["user_id"], evil_coef)
-        ctx.db.record_win(group_id, evil_winner["user_id"], "evil", ctx.config["points_evil"])
+        ctx.db.record_win(group_id, evil_winner["user_id"], "evil", settings["points_evil"])
 
-        evil_caption = await build_dragon_caption(ctx, group_id, evil_winner, "evil", ctx.config["points_evil"], evil_bets)
+        evil_caption = await build_dragon_caption(ctx, group_id, evil_winner, "evil", settings["points_evil"], evil_bets)
         await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["evil"]), caption=evil_caption)
 
     ctx.db.set_group_state(
@@ -109,7 +115,8 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
         await ctx.bot.send_message(group_id, "Победитель не найден — никто не в группе.")
         return
 
-    ctx.db.record_win(group_id, winner_id, "sleepy", ctx.config["points_sleepy"])
+    settings = ctx.db.get_group_settings(group_id, ctx.config)
+    ctx.db.record_win(group_id, winner_id, "sleepy", settings["points_sleepy"])
     winner_stats = ctx.db.get_user_stats(group_id, winner_id) or {}
     winner_dict = {
         "user_id": winner_id,
@@ -117,7 +124,7 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
         "first_name": winner_stats.get("first_name"),
         "last_name": winner_stats.get("last_name"),
     }
-    caption = await build_dragon_caption(ctx, group_id, winner_dict, "sleepy", ctx.config["points_sleepy"])
+    caption = await build_dragon_caption(ctx, group_id, winner_dict, "sleepy", settings["points_sleepy"])
     await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["sleepy"]), caption=caption)
     ctx.db.clear_sleep_entries(group_id, sleep_date)
 
@@ -143,7 +150,7 @@ async def scheduler_loop(ctx: AppContext) -> None:
                     state["next_sleepy_at"],
                     ctx.config,
                 )
-                asyncio.create_task(process_daily(ctx, group_id, state, send_day, send_evil))
+                asyncio.create_task(process_daily(ctx, group_id, settings, state, send_day, send_evil))
 
             next_sleepy_raw = state["next_sleepy_at"]
             next_sleepy_at = None

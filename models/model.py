@@ -10,6 +10,9 @@ class GroupSettings(Base):
     daily_time = Column(String(8), nullable=False)
     sleep_start = Column(String(8), nullable=False)
     sleep_end = Column(String(8), nullable=False)
+    points_day = Column(Integer, nullable=False, default=100)
+    points_evil = Column(Integer, nullable=False, default=-50)
+    points_sleepy = Column(Integer, nullable=False, default=120)
 
 
 class AllowedGroup(Base):

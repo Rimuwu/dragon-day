@@ -36,7 +36,19 @@ class Database:
 
     def init(self) -> None:
         Base.metadata.create_all(bind=self.engine)
+        self._ensure_group_settings_columns()
         self._ensure_group_state_columns()
+
+    def _ensure_group_settings_columns(self) -> None:
+        with self.engine.begin() as conn:
+            rows = conn.execute(text("PRAGMA table_info(group_settings)")).fetchall()
+            columns = {row[1] for row in rows}
+            if "points_day" not in columns:
+                conn.execute(text("ALTER TABLE group_settings ADD COLUMN points_day INTEGER"))
+            if "points_evil" not in columns:
+                conn.execute(text("ALTER TABLE group_settings ADD COLUMN points_evil INTEGER"))
+            if "points_sleepy" not in columns:
+                conn.execute(text("ALTER TABLE group_settings ADD COLUMN points_sleepy INTEGER"))
 
     def _ensure_group_state_columns(self) -> None:
         with self.engine.begin() as conn:
@@ -54,8 +66,18 @@ class Database:
                     daily_time=defaults["daily_time_default"],
                     sleep_start=defaults["sleep_start_default"],
                     sleep_end=defaults["sleep_end_default"],
+                    points_day=defaults["points_day"],
+                    points_evil=defaults["points_evil"],
+                    points_sleepy=defaults["points_sleepy"],
                 )
                 session.add(settings)
+            else:
+                if settings.points_day is None:
+                    settings.points_day = defaults["points_day"]
+                if settings.points_evil is None:
+                    settings.points_evil = defaults["points_evil"]
+                if settings.points_sleepy is None:
+                    settings.points_sleepy = defaults["points_sleepy"]
             state = session.get(GroupState, group_id)
             if state is None:
                 session.add(GroupState(group_id=group_id))
@@ -86,6 +108,9 @@ class Database:
             "daily_time": row.daily_time,
             "sleep_start": row.sleep_start,
             "sleep_end": row.sleep_end,
+            "points_day": row.points_day,
+            "points_evil": row.points_evil,
+            "points_sleepy": row.points_sleepy,
         }
 
     def set_group_time(self, group_id: int, daily_time: str, defaults: dict) -> None:
@@ -100,6 +125,21 @@ class Database:
             row = session.get(GroupSettings, group_id)
             row.sleep_start = sleep_start
             row.sleep_end = sleep_end
+
+    def set_group_points(
+        self,
+        group_id: int,
+        points_day: int,
+        points_evil: int,
+        points_sleepy: int,
+        defaults: dict,
+    ) -> None:
+        self.ensure_group(group_id, defaults)
+        with self._session() as session:
+            row = session.get(GroupSettings, group_id)
+            row.points_day = points_day
+            row.points_evil = points_evil
+            row.points_sleepy = points_sleepy
 
     def set_group_state(
         self,
