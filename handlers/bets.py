@@ -15,6 +15,22 @@ from utils.time_utils import today_str
 PAGE_SIZE = 10
 
 
+async def safe_edit_message(message, text, reply_markup=None, retries: int = 1):
+    try:
+        await message.edit_text(text, reply_markup=reply_markup)
+    except TelegramBadRequest as e:
+        msg = str(e)
+        if "message is not modified" in msg:
+            return
+        raise
+    except TelegramRetryAfter as e:
+        wait = getattr(e, "retry_after", 1)
+        if retries > 0:
+            await asyncio.sleep(wait)
+            return await safe_edit_message(message, text, reply_markup=reply_markup, retries=retries - 1)
+        raise
+
+
 def get_router(ctx: AppContext) -> Router:
     router = Router()
 
@@ -363,21 +379,6 @@ def get_router(ctx: AppContext) -> Router:
         )
         await callback.answer()
 
-
-async def safe_edit_message(message, text, reply_markup=None, retries: int = 1):
-    try:
-        await message.edit_text(text, reply_markup=reply_markup)
-    except TelegramBadRequest as e:
-        msg = str(e)
-        if "message is not modified" in msg:
-            return
-        raise
-    except TelegramRetryAfter as e:
-        wait = getattr(e, "retry_after", 1)
-        if retries > 0:
-            await asyncio.sleep(wait)
-            return await safe_edit_message(message, text, reply_markup=reply_markup, retries=retries - 1)
-        raise
 
     @router.callback_query(F.data.startswith("betapply:"))
     async def cb_bet_apply(callback: CallbackQuery) -> None:
