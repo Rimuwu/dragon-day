@@ -1,6 +1,8 @@
+import asyncio
 from datetime import datetime
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
@@ -28,7 +30,7 @@ def get_router(ctx: AppContext) -> Router:
         if total == 0:
             text = f"Ставка на {bet_title(bet_type)}\n\nПока нет участников."
             if isinstance(target, CallbackQuery):
-                await target.message.edit_text(text)
+                await safe_edit_message(target.message, text)
                 ctx.db.register_message_for_cleanup(
                     group_id,
                     target.message.chat.id,
@@ -105,7 +107,7 @@ def get_router(ctx: AppContext) -> Router:
             keyboard.inline_keyboard.append(nav)
 
         if isinstance(target, CallbackQuery):
-            await target.message.edit_text(text, reply_markup=keyboard)
+            await safe_edit_message(target.message, text, reply_markup=keyboard)
             ctx.db.register_message_for_cleanup(
                 group_id,
                 target.message.chat.id,
@@ -270,7 +272,7 @@ def get_router(ctx: AppContext) -> Router:
                 ],
             ]
         )
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await safe_edit_message(callback.message, text, reply_markup=keyboard)
         ctx.db.register_message_for_cleanup(
             group_id,
             callback.message.chat.id,
@@ -352,7 +354,7 @@ def get_router(ctx: AppContext) -> Router:
                 ],
             ]
         )
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await safe_edit_message(callback.message, text, reply_markup=keyboard)
         ctx.db.register_message_for_cleanup(
             group_id,
             callback.message.chat.id,
@@ -360,6 +362,22 @@ def get_router(ctx: AppContext) -> Router:
             datetime.now().isoformat(),
         )
         await callback.answer()
+
+
+async def safe_edit_message(message, text, reply_markup=None, retries: int = 1):
+    try:
+        await message.edit_text(text, reply_markup=reply_markup)
+    except TelegramBadRequest as e:
+        msg = str(e)
+        if "message is not modified" in msg:
+            return
+        raise
+    except TelegramRetryAfter as e:
+        wait = getattr(e, "retry_after", 1)
+        if retries > 0:
+            await asyncio.sleep(wait)
+            return await safe_edit_message(message, text, reply_markup=reply_markup, retries=retries - 1)
+        raise
 
     @router.callback_query(F.data.startswith("betapply:"))
     async def cb_bet_apply(callback: CallbackQuery) -> None:
