@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from typing import Any, cast
 
 from sqlalchemy import delete, func, select, text
 
@@ -21,6 +22,21 @@ class Database:
     def __init__(self, path: str) -> None:
         self.engine = build_engine(path)
         self.SessionLocal = build_session_factory(self.engine)
+
+    def _normalize_stat(self, stat: Stat) -> None:
+        stat_data = cast(Any, stat)
+        if stat_data.points is None:
+            stat_data.points = 100
+        if stat_data.wins_day is None:
+            stat_data.wins_day = 0
+        if stat_data.wins_evil is None:
+            stat_data.wins_evil = 0
+        if stat_data.wins_sleepy is None:
+            stat_data.wins_sleepy = 0
+        if stat_data.bets_played is None:
+            stat_data.bets_played = 0
+        if stat_data.bets_won is None:
+            stat_data.bets_won = 0
 
     @contextmanager
     def _session(self):
@@ -273,6 +289,7 @@ class Database:
             row = session.get(Stat, (group_id, user_id))
         if row is None:
             return None
+        self._normalize_stat(row)
         return {
             "points": row.points,
             "wins_day": row.wins_day,
@@ -311,7 +328,9 @@ class Database:
             if stat is None:
                 stat = Stat(group_id=group_id, user_id=user_id)
                 session.add(stat)
-            stat.points += delta
+            stat_data = cast(Any, stat)
+            self._normalize_stat(stat)
+            stat_data.points += delta
 
     def record_win(self, group_id: int, user_id: int, win_type: str, points_delta: int) -> None:
         column = {
@@ -324,8 +343,10 @@ class Database:
             if stat is None:
                 stat = Stat(group_id=group_id, user_id=user_id)
                 session.add(stat)
-            setattr(stat, column, getattr(stat, column) + 1)
-            stat.points += points_delta
+            stat_data = cast(Any, stat)
+            self._normalize_stat(stat)
+            setattr(stat_data, column, getattr(stat_data, column) + 1)
+            stat_data.points += points_delta
 
     def get_leaderboard(self, group_id: int, kind: str, limit: int, offset: int) -> list[dict]:
         column = {
@@ -346,6 +367,8 @@ class Database:
                 .scalars()
                 .all()
             )
+        for row in rows:
+            self._normalize_stat(row)
         return [
             {
                 "user_id": row.user_id,
@@ -478,7 +501,9 @@ class Database:
                 if stat is None:
                     stat = Stat(group_id=group_id, user_id=user_id)
                     session.add(stat)
-                stat.points += int(total)
+                stat_data = cast(Any, stat)
+                self._normalize_stat(stat)
+                stat_data.points += int(total)
         return int(total)
 
     def settle_bets(
@@ -508,11 +533,13 @@ class Database:
                 if stat is None:
                     stat = Stat(group_id=group_id, user_id=bet.user_id)
                     session.add(stat)
+                stat_data = cast(Any, stat)
+                self._normalize_stat(stat)
                 if winner_id is not None and bet.target_user_id == winner_id:
                     payout = int(bet.amount * coef)
-                    stat.points += payout
-                    stat.bets_played += 1
-                    stat.bets_won += 1
+                    stat_data.points += payout
+                    stat_data.bets_played += 1
+                    stat_data.bets_won += 1
                     won_points += payout
                     winning_bets.append(
                         {
@@ -522,7 +549,7 @@ class Database:
                         }
                     )
                 else:
-                    stat.bets_played += 1
+                    stat_data.bets_played += 1
                     lost_points += bet.amount
 
             for bet in bets:

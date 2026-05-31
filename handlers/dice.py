@@ -1,3 +1,5 @@
+import asyncio
+
 from datetime import datetime
 
 from aiogram import Router
@@ -32,6 +34,8 @@ def get_router(ctx: AppContext) -> Router:
         
         ctx.db.adjust_points(message.chat.id, message.from_user.id, points)
         ctx.db.record_roll(message.chat.id, message.from_user.id, today)
+
+        await asyncio.sleep(5)
         
         await message.answer(f"🎲 Вы получаете {points} очков! (выпало {dice_value})")
 
