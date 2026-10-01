@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 from utils.context import AppContext
-from utils.guards import ensure_supported_group
+from utils.guards import ensure_participant, ensure_supported_group
 
 
 def get_router(ctx: AppContext) -> Router:
@@ -19,6 +19,8 @@ def get_router(ctx: AppContext) -> Router:
             await callback.answer("Ошибка группы.")
             return
         if not await ensure_supported_group(ctx, callback):
+            return
+        if not await ensure_participant(ctx, callback):
             return
         event = ctx.db.get_sleep_event(group_id, sleep_date)
         if not event:

@@ -1,4 +1,4 @@
-import random
+import secrets
 from datetime import datetime, timedelta, time
 from zoneinfo import ZoneInfo
 
@@ -33,4 +33,5 @@ def pick_random_time(start_dt: datetime, end_dt: datetime) -> datetime:
     total_seconds = int((end_dt - start_dt).total_seconds())
     if total_seconds <= 0:
         return start_dt
-    return start_dt + timedelta(seconds=random.randint(0, total_seconds))
+    rng = secrets.SystemRandom()
+    return start_dt + timedelta(seconds=rng.randint(0, total_seconds))

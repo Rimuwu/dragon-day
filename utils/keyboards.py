@@ -1,6 +1,11 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from utils.helpers import format_user_label
+
+
+from utils.custom_emojis import get_emoji_id
+
 
 def build_leaderboard_keyboard(
     group_id: int,
@@ -11,22 +16,45 @@ def build_leaderboard_keyboard(
     page_size: int,
 ) -> InlineKeyboardMarkup:
     total_pages = max(1, (total + page_size - 1) // page_size)
-    builder = InlineKeyboardBuilder()
-    if page > 0:
-        builder.add(
+    categories = [
+        ("points", "Очки", "coin", "🪙"),
+        ("day", "День", "sun", "☀️"),
+        ("evil", "Зло", "evil", "😈"),
+        ("sleepy", "Сон", "sleepy", "😴"),
+    ]
+    tab_row = []
+    for c_kind, label, emoji_key, fallback_emoji in categories:
+        e_id = get_emoji_id(emoji_key)
+        display_label = label if e_id else f"{fallback_emoji} {label}"
+        btn_text = f"• {display_label} •" if c_kind == kind else display_label
+        tab_row.append(
             InlineKeyboardButton(
-                text="Назад",
+                text=btn_text,
+                icon_custom_emoji_id=e_id,
+                callback_data=f"lb:{group_id}:{owner_id}:{c_kind}:0",
+            )
+        )
+
+    nav_row = []
+    if page > 0:
+        nav_row.append(
+            InlineKeyboardButton(
+                text="⬅️ Назад",
                 callback_data=f"lb:{group_id}:{owner_id}:{kind}:{page - 1}",
             )
         )
     if page + 1 < total_pages:
-        builder.add(
+        nav_row.append(
             InlineKeyboardButton(
-                text="Вперёд",
+                text="Вперёд ➡️",
                 callback_data=f"lb:{group_id}:{owner_id}:{kind}:{page + 1}",
             )
         )
-    return builder.as_markup()
+
+    keyboard = [tab_row]
+    if nav_row:
+        keyboard.append(nav_row)
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 def build_bet_keyboard(
@@ -41,8 +69,12 @@ def build_bet_keyboard(
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for person in participants:
-        name = person.get("username")
-        label = f"@{name}" if name else person.get("first_name") or person.get("last_name") or f"ID {person['user_id']}"
+        label = format_user_label(
+            person["user_id"],
+            person.get("username"),
+            person.get("first_name"),
+            person.get("last_name"),
+        )
         builder.row(
             InlineKeyboardButton(
                 text=f"-{step} {label}",

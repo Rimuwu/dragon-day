@@ -153,8 +153,7 @@ def get_router(ctx: AppContext) -> Router:
             "Текущее состояние:\n"
             f"• Последний дракон дня: {_format_state_value(state['last_daily_date'], ctx.tz, date_only=True)}\n"
             f"• Последний злой дракон: {_format_state_value(state['last_evil_date'], ctx.tz, date_only=True)}\n"
-            f"• Последний сонный дракон: {_format_state_value(state['last_sleepy_date'], ctx.tz, date_only=True)}\n"
-            f"• Следующий сонный: {_format_state_value(state['next_sleepy_at'], ctx.tz)}"
+            f"• Последний сонный дракон: {_format_state_value(state['last_sleepy_date'], ctx.tz, date_only=True)}"
         )
         await message.answer(text)
 

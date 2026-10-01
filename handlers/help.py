@@ -10,49 +10,79 @@ from utils.guards import ensure_group_message, ensure_supported_group
 
 def _build_commands() -> list[BotCommand]:
     return [
-        BotCommand(command="help", description="Список команд и настройка кнопок"),
-        BotCommand(command="add_group", description="Добавить группу (админ бота)"),
-        BotCommand(command="repick", description="Переиграть дракона (админ бота)"),
-        BotCommand(command="points", description="Изменить очки (админ бота)"),
-        BotCommand(command="set_points", description="Настроить очки драконов группы"),
-        BotCommand(command="group_settings", description="Показать настройки группы"),
-        BotCommand(command="enter", description="Вступить в список участников"),
-        BotCommand(command="leave", description="Покинуть список участников"),
-        BotCommand(command="leaderboard", description="Топы дня/злых/сонных/очков"),
-        BotCommand(command="set_time", description="Установить время ежедневного топа"),
-        BotCommand(command="sleep_time", description="Установить окно ночного дракона"),
+        BotCommand(command="help", description="Справочник команд бота"),
+        BotCommand(command="me", description="Ваш профиль и статистика"),
+        BotCommand(command="enter", description="Вступить в стаю"),
+        BotCommand(command="leave", description="Покинуть игру"),
+        BotCommand(command="leaderboard", description="Зал славы и топы"),
+        BotCommand(command="roll", description="Ежедневный кубик 🎲 (1 раз в день)"),
+        BotCommand(command="basket", description="Баскетбол 🏀 (1 раз в день)"),
+        BotCommand(command="bowling", description="Боулинг 🎳 (1 раз в день)"),
+        BotCommand(command="football", description="Футбол ⚽ (1 раз в день)"),
+        BotCommand(command="duel", description="Дуэль на кубиках (/duel <ставка>)"),
+        BotCommand(command="lottery", description="Лотерея (/lottery <ставка> или /lottery <номер>)"),
         BotCommand(command="bet_day", description="Ставки на дракона дня"),
         BotCommand(command="bet_evil", description="Ставки на злого дракона"),
-        BotCommand(command="cancel_day", description="Отменить ставки на дракона дня"),
-        BotCommand(command="cancel_evil", description="Отменить ставки на злого дракона"),
         BotCommand(command="my_bets", description="Мои активные ставки"),
-        BotCommand(command="roll", description="Кубик для очков (1 раз в день)"),
-        BotCommand(command="me", description="Профиль игрока")
+        BotCommand(command="cancel_day", description="Снять ставку на дракона дня"),
+        BotCommand(command="cancel_evil", description="Снять ставку на злого дракона"),
+        BotCommand(command="group_settings", description="Настройки группы"),
+        BotCommand(command="set_time", description="Время топа (админ группы)"),
+        BotCommand(command="sleep_time", description="Окно сна (админ группы)"),
+        BotCommand(command="set_points", description="Очки драконов (админ группы)"),
     ]
 
 
-def _build_help_text() -> str:
-    return (
-        "Команды бота:\n"
-        "/add_group — добавить группу (только админ бота)\n"
-        "/repick <day|evil> — переиграть дракона (только админ бота)\n"
-        "/points — изменить очки (только админ бота)\n"
-        "/set_points <day> <evil> <sleepy> — настроить очки драконов группы\n"
-        "/group_settings — показать настройки группы и текущее состояние\n"
-        "/enter — вступить в список участников\n"
-        "/leave — выйти из списка участников\n"
-        "/leaderboard [day|evil|sleepy|points] — топ по категориям\n"
-        "/set_time HH:MM — время ежедневного топа (админы группы)\n"
-        "/sleep_time HH:MM-HH:MM — окно ночного дракона (админы группы)\n"
-        "/bet_day — ставки на дракона дня\n"
-        "/bet_evil — ставки на злого дракона\n"
-        "/cancel_day — отмена ставок на дракона дня\n"
-        "/cancel_evil — отмена ставок на злого дракона\n"
-        "/my_bets — активные ставки\n"
-        "/roll — кубик для получения очков (1 раз в день)\n"
-        "/me — ваш профиль\n\n"
-        "Эта команда также обновляет кнопки команд в группе."
-    )
+def _build_help_text(is_bot_admin: bool = False) -> str:
+    lines = [
+        "📖 <b>СПРАВОЧНИК КОМАНД • DRAGON DAY</b>",
+        "────────────────────",
+        "",
+        "👤 <b>Участие и профиль:</b>",
+        "• <code>/enter</code> — вступить в стаю и участвовать в событиях",
+        "• <code>/leave</code> — выйти из игры",
+        "• <code>/me</code> — профиль, винрейт, серии побед, шансы и очки",
+        "",
+        "🏆 <b>Рейтинги и зал славы:</b>",
+        "• <code>/leaderboard</code> (или <code>/top</code>) — общий зал славы и топы",
+        "",
+        "🎲 <b>Мини-игры и заработок:</b>",
+        "• <code>/roll</code> — бросок кубика раз в сутки 🎲",
+        "• <code>/basket</code> — баскетбол в кольцо раз в сутки 🏀",
+        "• <code>/bowling</code> — боулинг со страйками раз в сутки 🎳",
+        "• <code>/football</code> — пенальти в футболе раз в сутки ⚽",
+        "• <code>/duel &lt;ставка&gt;</code> — дуэль на кубиках 2d6 (ответом или открытая)",
+        "• <code>/lottery &lt;ставка&gt; [номер]</code> — запустить лотерею на 100 билетов (банк = сумма ставок)",
+        "• <code>/lottery &lt;номер&gt;</code> — купить выбранный билет (1–100) в активной лотерее",
+        "",
+        "🔥 <b>Ставки на драконов:</b>",
+        "• <code>/bet_day</code> — открыть пул ставок на Дракона Дня",
+        "• <code>/bet_evil</code> — открыть пул ставок на Злого Дракона",
+        "• <code>/my_bets</code> — просмотр активных ставок на сегодня",
+        "• <code>/cancel_day</code> — отменить ставку на дракона дня",
+        "• <code>/cancel_evil</code> — отменить ставку на злого дракона",
+        "",
+        "⚙️ <b>Настройки группы (для админов):</b>",
+        "• <code>/group_settings</code> — текущие параметры и расписание",
+        "• <code>/set_time HH:MM</code> — время выбора дракона дня",
+        "• <code>/sleep_time HH:MM-HH:MM</code> — окно сна ночного дракона",
+        "• <code>/set_points &lt;день&gt; &lt;злой&gt; &lt;сонный&gt;</code> — награды в очках",
+    ]
+
+    if is_bot_admin:
+        lines.extend([
+            "",
+            "🛠 <b>Управление ботом (админ бота):</b>",
+            "• <code>/add_group</code> — привязать группу к боту",
+            "• <code>/repick &lt;day|evil&gt;</code> — переиграть результат",
+            "• <code>/points &lt;@user&gt; &lt;очки&gt;</code> — начислить/списать очки",
+        ])
+
+    lines.extend([
+        "────────────────────",
+        "<i>💡 Меню команд бота в Telegram также автоматически обновлено!</i>",
+    ])
+    return "\n".join(lines)
 
 
 def get_router(ctx: AppContext) -> Router:
@@ -69,7 +99,8 @@ def get_router(ctx: AppContext) -> Router:
             _build_commands(),
             scope=BotCommandScopeChat(chat_id=message.chat.id),
         )
-        sent = await message.answer(_build_help_text())
+        is_bot_admin = message.from_user is not None and message.from_user.id == ctx.admin_id
+        sent = await message.answer(_build_help_text(is_bot_admin), parse_mode="HTML")
         ctx.db.register_message_for_cleanup(
             message.chat.id,
             sent.chat.id,

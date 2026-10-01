@@ -35,13 +35,24 @@ async def process_daily(
         await ctx.bot.send_message(group_id, "Сегодня нет участников для выбора драконов.")
         return
 
-    day_winner = await pick_valid_member(ctx, group_id, participants)
+    # 1. Day Dragon: pick from candidate pool
+    day_pool = ctx.db.get_or_create_bet_pool(group_id, "day", today, ctx.config, participants)
+    candidates_day = day_pool if day_pool else participants
+    day_winner = await pick_valid_member(ctx, group_id, candidates_day, "day")
+    if not day_winner and candidates_day != participants:
+        day_winner = await pick_valid_member(ctx, group_id, participants, "day")
+
     if not day_winner:
         await ctx.bot.send_message(group_id, "Нет доступных участников в группе.")
         return
 
-    remaining = [p for p in participants if p["user_id"] != day_winner["user_id"]]
-    evil_winner = await pick_valid_member(ctx, group_id, remaining) if remaining else day_winner
+    # 2. Evil Dragon: pick from candidate pool (excluding day winner)
+    evil_pool = ctx.db.get_or_create_bet_pool(group_id, "evil", today, ctx.config, participants)
+    remaining_evil = [p for p in evil_pool if p["user_id"] != day_winner["user_id"]]
+    if not remaining_evil:
+        remaining_evil = [p for p in participants if p["user_id"] != day_winner["user_id"]]
+
+    evil_winner = await pick_valid_member(ctx, group_id, remaining_evil, "evil") if remaining_evil else day_winner
 
     if send_day:
         day_stats = ctx.db.get_user_stats(group_id, day_winner["user_id"]) or {}
@@ -52,10 +63,12 @@ async def process_daily(
         )
         day_coef = compute_coef(day_wins_total, ctx.config)
         day_bets = ctx.db.settle_bets(group_id, "day", today, day_winner["user_id"], day_coef)
-        ctx.db.record_win(group_id, day_winner["user_id"], "day", settings["points_day"])
+        ctx.db.record_win(group_id, day_winner["user_id"], "day", settings["points_day"], today)
 
-        day_caption = await build_dragon_caption(ctx, group_id, day_winner, "day", settings["points_day"], day_bets)
-        await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["day"]), caption=day_caption)
+        from utils.effects import apply_dragon_effect
+        day_effect = apply_dragon_effect(ctx, group_id, "day", day_winner["user_id"], today)
+        day_caption = await build_dragon_caption(ctx, group_id, day_winner, "day", settings["points_day"], day_bets, effect=day_effect)
+        await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["day"]), caption=day_caption, parse_mode="HTML")
 
     if evil_winner and send_evil:
         evil_stats = ctx.db.get_user_stats(group_id, evil_winner["user_id"]) or {}
@@ -66,10 +79,12 @@ async def process_daily(
         )
         evil_coef = compute_coef(evil_wins_total, ctx.config)
         evil_bets = ctx.db.settle_bets(group_id, "evil", today, evil_winner["user_id"], evil_coef)
-        ctx.db.record_win(group_id, evil_winner["user_id"], "evil", settings["points_evil"])
+        ctx.db.record_win(group_id, evil_winner["user_id"], "evil", settings["points_evil"], today)
 
-        evil_caption = await build_dragon_caption(ctx, group_id, evil_winner, "evil", settings["points_evil"], evil_bets)
-        await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["evil"]), caption=evil_caption)
+        from utils.effects import apply_dragon_effect
+        evil_effect = apply_dragon_effect(ctx, group_id, "evil", evil_winner["user_id"], today)
+        evil_caption = await build_dragon_caption(ctx, group_id, evil_winner, "evil", settings["points_evil"], evil_bets, effect=evil_effect)
+        await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["evil"]), caption=evil_caption, parse_mode="HTML")
 
     ctx.db.set_group_state(
         group_id,
@@ -100,32 +115,32 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
 
     entries = ctx.db.get_sleep_entries(group_id, sleep_date)
     if not entries:
-        await ctx.bot.send_message(group_id, "Никто не участвовал в ночном драконе сегодня.")
-        return
+        # Если никто не нажал кнопку — охватываем всех участников чата
+        all_participants = ctx.db.list_participants(group_id)
+        if not all_participants:
+            await ctx.bot.send_message(group_id, "Никто не участвовал в ночном драконе сегодня.")
+            return
+        candidate_dicts = all_participants
+    else:
+        candidate_dicts = [{"user_id": uid} for uid in entries]
 
-    random.shuffle(entries)
-    winner_id = None
-    for user_id in entries:
-        member = await ctx.bot.get_chat_member(group_id, user_id)
-        if member.status not in ("left", "kicked"):
-            winner_id = user_id
-            break
-
-    if winner_id is None:
+    winner_person = await pick_valid_member(ctx, group_id, candidate_dicts, "sleepy")
+    if not winner_person:
         await ctx.bot.send_message(group_id, "Победитель не найден — никто не в группе.")
         return
 
+    winner_id = winner_person["user_id"]
     settings = ctx.db.get_group_settings(group_id, ctx.config)
-    ctx.db.record_win(group_id, winner_id, "sleepy", settings["points_sleepy"])
+    ctx.db.record_win(group_id, winner_id, "sleepy", settings["points_sleepy"], sleep_date)
     winner_stats = ctx.db.get_user_stats(group_id, winner_id) or {}
     winner_dict = {
         "user_id": winner_id,
-        "username": winner_stats.get("username"),
-        "first_name": winner_stats.get("first_name"),
-        "last_name": winner_stats.get("last_name"),
+        "username": winner_stats.get("username") or winner_person.get("username"),
+        "first_name": winner_stats.get("first_name") or winner_person.get("first_name"),
+        "last_name": winner_stats.get("last_name") or winner_person.get("last_name"),
     }
     caption = await build_dragon_caption(ctx, group_id, winner_dict, "sleepy", settings["points_sleepy"])
-    await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["sleepy"]), caption=caption)
+    await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["sleepy"]), caption=caption, parse_mode="HTML")
     ctx.db.clear_sleep_entries(group_id, sleep_date)
 
 
@@ -199,11 +214,9 @@ async def cleanup_loop(ctx: AppContext) -> None:
             stale = ctx.db.get_stale_messages(timeout)
             for msg_info in stale:
                 try:
-                    await ctx.bot.edit_message_text(
-                        text="Это сообщение устарело, воспользуйтесь командой заново.",
+                    await ctx.bot.delete_message(
                         chat_id=msg_info["chat_id"],
                         message_id=msg_info["message_id"],
-                        reply_markup=None
                     )
                 except Exception:
                     pass
@@ -220,6 +233,95 @@ async def cleanup_loop(ctx: AppContext) -> None:
         await asyncio.sleep(30)
 
 
+async def lottery_loop(ctx: AppContext) -> None:
+    from aiogram.types import BufferedInputFile
+    from utils.custom_emojis import fmt_emoji
+    from utils.helpers import format_user_name
+    from utils.lottery_card import render_lottery_card
+
+    while True:
+        try:
+            expired = ctx.db.get_expired_active_lotteries()
+            for lot_meta in expired:
+                lot_id = lot_meta["id"]
+                group_id = lot_meta["group_id"]
+                res = ctx.db.finish_lottery(lot_id)
+                if not res:
+                    continue
+
+                if res.get("canceled"):
+                    creator_id = res["creator_id"]
+                    creator_ident = ctx.db.get_user_identity(group_id, creator_id) or {}
+                    creator_name = format_user_name(
+                        creator_id,
+                        creator_ident.get("username"),
+                        creator_ident.get("first_name"),
+                        creator_ident.get("last_name"),
+                    )
+                    await ctx.bot.send_message(
+                        group_id,
+                        f"🎟️ <b>Лотерея #{lot_id} завершена.</b>\n"
+                        f"Не набралось достаточного количества участников (минимум 2).\n"
+                        f"Ставка возвращена {creator_name}.",
+                        parse_mode="HTML",
+                    )
+                else:
+                    winner_id = res["winner_id"]
+                    winner_ident = ctx.db.get_user_identity(group_id, winner_id) or {}
+                    winner_name = format_user_name(
+                        winner_id,
+                        winner_ident.get("username"),
+                        winner_ident.get("first_name"),
+                        winner_ident.get("last_name"),
+                    )
+                    winning_ticket = res["winning_ticket"]
+                    total_pot = res["total_pot"]
+                    bet = res["bet"]
+                    sold_tickets = res.get("sold_tickets", [])
+                    total_sold = len(sold_tickets)
+
+                    card_buf = render_lottery_card(
+                        prize=total_pot,
+                        ticket_price=bet,
+                        sold_count=total_sold,
+                        sold_tickets=sold_tickets,
+                        winning_ticket=winning_ticket,
+                    )
+
+                    coin_e = fmt_emoji("coin", "🪙")
+                    crown_e = fmt_emoji("crown", "👑")
+
+                    caption = (
+                        f"🏆 <b>ИТОГИ КОРОЛЕВСКОЙ ЛОТЕРЕИ #{lot_id}!</b>\n"
+                        f"────────────────────\n"
+                        f"🎟️ <b>Выигрышный билет:</b> <code>#{winning_ticket:03d}</code>\n"
+                        f"{crown_e} <b>Победитель:</b> {winner_name}\n"
+                        f"{coin_e} <b>Выигрышный куш:</b> <b>{total_pot:,} очков</b>\n"
+                        f"────────────────────\n"
+                        f"<i>Всего билетов в розыгрыше: {total_sold} шт.</i>"
+                    ).replace(",", " ")
+
+                    photo = BufferedInputFile(card_buf.getvalue(), filename=f"lottery_result_{lot_id}.png")
+                    sent = await ctx.bot.send_photo(
+                        chat_id=group_id,
+                        photo=photo,
+                        caption=caption,
+                        parse_mode="HTML",
+                    )
+                    if sent:
+                        ctx.db.register_message_for_cleanup(
+                            group_id,
+                            sent.chat.id,
+                            sent.message_id,
+                            datetime.now().isoformat(),
+                        )
+        except Exception as e:
+            pass
+
+        await asyncio.sleep(20)
+
+
 async def start_scheduler(ctx: AppContext) -> None:
     asyncio.create_task(scheduler_loop(ctx))
     asyncio.create_task(cleanup_loop(ctx))
+    asyncio.create_task(lottery_loop(ctx))
