@@ -1,4 +1,5 @@
 import asyncio
+import html
 import io
 import logging
 from datetime import datetime
@@ -116,7 +117,7 @@ def get_router(ctx: AppContext) -> Router:
         fire_e = fmt_emoji("fire", "🔥")
 
         if target_id:
-            opponent_line = f"🎯 <b>Вызов брошен:</b> {target_name}"
+            opponent_line = f"🎯 <b>Вызов брошен:</b> {html.escape(target_name)}"
             accept_text = f"⚔️ Принять вызов ({bet} {coin_e})"
         else:
             opponent_line = "🎯 <b>Вызов:</b> Любому желающему!"
@@ -125,7 +126,7 @@ def get_router(ctx: AppContext) -> Router:
         text = (
             f"⚔️ <b>ВЫЗОВ НА ДУЭЛЬ!</b>\n"
             f"────────────────────\n"
-            f"👤 <b>Инициатор:</b> {creator_name}\n"
+            f"👤 <b>Инициатор:</b> {html.escape(creator_name)}\n"
             f"{opponent_line}\n"
             f"{coin_e} <b>Ставка:</b> {bet:,} очков\n"
             f"{fire_e} <b>Банк победителя:</b> {bet * 2:,} очков\n"
@@ -268,12 +269,12 @@ def get_router(ctx: AppContext) -> Router:
         if winner_id == creator_id:
             outcome_title = f"{crown_e} <b>ПОБЕДА ИНИЦИАТОРА!</b>"
             outcome_desc = (
-                f"🏆 <b>{creator_name}</b> одерживает победу и забирает банк <b>{pot:,} {coin_e}</b>!"
+                f"🏆 <b>{html.escape(creator_name)}</b> одерживает победу и забирает банк <b>{pot:,} {coin_e}</b>!"
             )
         elif winner_id == opponent.id:
             outcome_title = f"{crown_e} <b>ПОБЕДА СОПЕРНИКА!</b>"
             outcome_desc = (
-                f"🏆 <b>{opponent_name}</b> одерживает победу и забирает банк <b>{pot:,} {coin_e}</b>!"
+                f"🏆 <b>{html.escape(opponent_name)}</b> одерживает победу и забирает банк <b>{pot:,} {coin_e}</b>!"
             )
         else:
             outcome_title = f"🤝 <b>БОЕВАЯ НИЧЬЯ!</b>"

@@ -1,7 +1,7 @@
 import html
 
 from utils.context import AppContext
-from utils.helpers import format_user_name
+from utils.helpers import format_leaderboard_user_name, format_user_name
 from utils.phrases import pick_phrase
 
 
@@ -58,7 +58,7 @@ async def build_dragon_caption(
                     "first_name": None,
                     "last_name": None,
                 }
-                raw_bettor_name = format_user_name(
+                raw_bettor_name = format_leaderboard_user_name(
                     bettor["user_id"],
                     bettor.get("username"),
                     bettor.get("first_name"),

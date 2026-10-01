@@ -1,4 +1,5 @@
 import asyncio
+import html
 import io
 import logging
 from datetime import datetime
@@ -17,11 +18,11 @@ from aiogram.types import (
 
 from handlers.profile import fetch_user_avatar
 from utils.bet_card import render_bet_card
-from utils.card_cache import get_cached_general, invalidate_general_cache, set_cached_general, update_cached_general_file_id
+from utils.card_cache import get_cached_general, set_cached_general, update_cached_general_file_id
 from utils.context import AppContext
 from utils.custom_emojis import fmt_emoji, get_emoji_id
 from utils.guards import ensure_group_message, ensure_participant, ensure_supported_group
-from utils.helpers import compute_coef, format_user_label, format_user_name, has_user_display_name
+from utils.helpers import compute_coef, format_leaderboard_user_name, format_user_label, format_user_name, has_user_display_name
 from utils.member import resolve_user_display
 from utils.texts import bet_title
 from utils.time_utils import today_str
@@ -53,7 +54,7 @@ def build_bet_caption(
         amt = user_bet["amount"]
         target_cand = next((c for c in candidates if c["user_id"] == target_id), None)
         target_name = target_cand["display_name"] if target_cand else f"ID {target_id}"
-        bet_status_str = f"Ваша ставка: <b>{amt:,} 🪙 на {target_name}</b>".replace(",", " ")
+        bet_status_str = f"Ваша ставка: <b>{amt:,} 🪙 на {html.escape(target_name)}</b>".replace(",", " ")
     else:
         total_amt = sum(b["amount"] for b in user_bets)
         items = []
@@ -62,7 +63,7 @@ def build_bet_caption(
             amt = b["amount"]
             target_cand = next((c for c in candidates if c["user_id"] == target_id), None)
             target_name = target_cand["display_name"] if target_cand else f"ID {target_id}"
-            items.append(f"<b>{target_name}</b> — <b>{amt:,} 🪙</b>".replace(",", " "))
+            items.append(f"<b>{html.escape(target_name)}</b> — <b>{amt:,} 🪙</b>".replace(",", " "))
         bet_status_str = f"Ваши ставки (всего <b>{total_amt:,} 🪙</b>):\n  ▫️ " + "\n  ▫️ ".join(items)
 
     lines = [
@@ -77,7 +78,7 @@ def build_bet_caption(
     ]
 
     for idx, c in enumerate(candidates, start=1):
-        name = c["display_name"]
+        name = html.escape(c["display_name"])
         coef = c.get("coef", 2.0)
         coef_str = f"x{coef:.1f}" if coef == round(coef, 1) else f"x{coef:.2f}"
         total_b = c.get("total_bets", 0)
@@ -188,11 +189,12 @@ async def get_or_render_pool_card(
     bet_date: str,
     candidates: list[dict],
     total_participants: int,
-) -> tuple[bytes, str | None]:
+) -> tuple[bytes, str | None, str]:
     cache_key = f"bet_pool_card:{group_id}:{bet_type}:{bet_date}"
     cached = get_cached_general(cache_key)
     if cached is not None:
-        return cached
+        card_bytes, file_id = cached
+        return card_bytes, file_id, cache_key
 
     for c in candidates:
         c["avatar_bytes"] = await fetch_user_avatar(ctx.bot, c["user_id"])
@@ -205,8 +207,9 @@ async def get_or_render_pool_card(
         total_participants=total_participants,
     )
     card_bytes = buf.getvalue()
-    set_cached_general(cache_key, card_bytes)
-    return card_bytes, None
+    # Cache for the whole day (24 hours) since pool candidates don't change within the day
+    set_cached_general(cache_key, card_bytes, ttl=86400)
+    return card_bytes, None, cache_key
 
 
 def get_router(ctx: AppContext) -> Router:
@@ -245,7 +248,8 @@ def get_router(ctx: AppContext) -> Router:
                 c.get("first_name"),
                 c.get("last_name"),
             )
-            display_name = format_user_name(c["user_id"], u_name, f_name, l_name)
+            # Use non-pinging user name (like in leaderboard)
+            display_name = format_leaderboard_user_name(c["user_id"], u_name, f_name, l_name)
             stats = ctx.db.get_user_stats(group_id, c["user_id"]) or {}
             wins_total = stats.get("wins_day", 0) + stats.get("wins_evil", 0) + stats.get("wins_sleepy", 0)
             coef = compute_coef(wins_total, ctx.config)
@@ -265,40 +269,77 @@ def get_router(ctx: AppContext) -> Router:
         caption_text = build_bet_caption(candidates, group_id, owner_id, bet_type, bet_date, ctx)
         keyboard = build_bet_keyboard(candidates, group_id, owner_id, bet_type, has_user_bet)
 
-        card_bytes, file_id = await get_or_render_pool_card(
+        card_bytes, file_id, cache_key = await get_or_render_pool_card(
             ctx, group_id, bet_type, bet_date, candidates, len(all_participants)
         )
 
         if isinstance(target, CallbackQuery):
             msg = target.message
             if msg and msg.photo:
+                # Fast path: already has photo, simply update caption without re-uploading media
                 try:
-                    photo_file = BufferedInputFile(card_bytes, filename=f"pool_{bet_type}_{group_id}.png")
-                    await msg.edit_media(
-                        media=InputMediaPhoto(media=photo_file, caption=caption_text, parse_mode="HTML"),
-                        reply_markup=keyboard,
-                    )
+                    await msg.edit_caption(caption=caption_text, parse_mode="HTML", reply_markup=keyboard)
+                except TelegramBadRequest as e:
+                    if "message is not modified" not in str(e):
+                        logger.debug("edit_caption failed: %s", e)
                 except Exception as e:
-                    logger.debug("edit_media failed: %s, falling back to edit_caption", e)
+                    logger.debug("edit_caption failed, fallback to edit_media: %s", e)
+                    media = file_id if file_id else BufferedInputFile(card_bytes, filename=f"pool_{bet_type}_{group_id}.png")
                     try:
-                        await msg.edit_caption(caption=caption_text, parse_mode="HTML", reply_markup=keyboard)
+                        res = await msg.edit_media(
+                            media=InputMediaPhoto(media=media, caption=caption_text, parse_mode="HTML"),
+                            reply_markup=keyboard,
+                        )
+                        if res and getattr(res, "photo", None):
+                            update_cached_general_file_id(cache_key, res.photo[-1].file_id)
                     except Exception:
                         pass
             elif msg:
-                photo_file = BufferedInputFile(card_bytes, filename=f"pool_{bet_type}_{group_id}.png")
-                sent = await msg.answer_photo(photo_file, caption=caption_text, parse_mode="HTML", reply_markup=keyboard)
+                sent = None
+                if file_id:
+                    try:
+                        sent = await msg.answer_photo(
+                            photo=file_id,
+                            caption=caption_text,
+                            parse_mode="HTML",
+                            reply_markup=keyboard,
+                        )
+                    except Exception:
+                        sent = None
+                if not sent:
+                    photo_file = BufferedInputFile(card_bytes, filename=f"pool_{bet_type}_{group_id}.png")
+                    sent = await msg.answer_photo(photo_file, caption=caption_text, parse_mode="HTML", reply_markup=keyboard)
+                if sent and sent.photo:
+                    update_cached_general_file_id(cache_key, sent.photo[-1].file_id)
                 if sent:
                     ctx.db.register_message_for_cleanup(group_id, sent.chat.id, sent.message_id, datetime.now().isoformat())
         else:
-            photo_file = BufferedInputFile(card_bytes, filename=f"pool_{bet_type}_{group_id}.png")
-            sent = await target.answer_photo(
-                photo=file_id or photo_file,
-                caption=caption_text,
-                parse_mode="HTML",
-                reply_markup=keyboard,
-            )
+            # Initial command /bet_day or /bet_evil
+            sent = None
+            if file_id:
+                try:
+                    sent = await target.answer_photo(
+                        photo=file_id,
+                        caption=caption_text,
+                        parse_mode="HTML",
+                        reply_markup=keyboard,
+                    )
+                except Exception as e_fid:
+                    logger.debug("Sending with cached file_id failed: %s", e_fid)
+                    sent = None
+
+            if not sent:
+                photo_file = BufferedInputFile(card_bytes, filename=f"pool_{bet_type}_{group_id}.png")
+                sent = await target.answer_photo(
+                    photo=photo_file,
+                    caption=caption_text,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+
             if sent and sent.photo:
-                update_cached_general_file_id(f"bet_pool_card:{group_id}:{bet_type}:{bet_date}", sent.photo[-1].file_id)
+                update_cached_general_file_id(cache_key, sent.photo[-1].file_id)
+
             if sent:
                 ctx.db.register_message_for_cleanup(group_id, sent.chat.id, sent.message_id, datetime.now().isoformat())
 
@@ -380,7 +421,7 @@ def get_router(ctx: AppContext) -> Router:
             target.get("first_name") if target else None,
             target.get("last_name") if target else None,
         )
-        name = format_user_name(target_id, u_name, f_name, l_name)
+        name = html.escape(format_leaderboard_user_name(target_id, u_name, f_name, l_name))
         stats = ctx.db.get_user_stats(group_id, target_id) or {}
         wins_total = stats.get("wins_day", 0) + stats.get("wins_evil", 0) + stats.get("wins_sleepy", 0)
         coef = compute_coef(wins_total, ctx.config)
@@ -435,7 +476,7 @@ def get_router(ctx: AppContext) -> Router:
             target.get("first_name") if target else None,
             target.get("last_name") if target else None,
         )
-        name = format_user_name(target_id, u_name, f_name, l_name)
+        name = html.escape(format_leaderboard_user_name(target_id, u_name, f_name, l_name))
         stats = ctx.db.get_user_stats(group_id, target_id) or {}
         wins_total = stats.get("wins_day", 0) + stats.get("wins_evil", 0) + stats.get("wins_sleepy", 0)
         coef = compute_coef(wins_total, ctx.config)
@@ -494,9 +535,6 @@ def get_router(ctx: AppContext) -> Router:
             await callback.answer(error, show_alert=True)
             return
 
-        # Invalidate card cache so new bet volume re-renders on card
-        invalidate_general_cache(f"bet_pool_card:{group_id}:{bet_type}:{bet_date}")
-
         await callback.answer(f"✅ Ставка {desired_amount} 🪙 сохранена!", show_alert=False)
         await send_bet_pool_menu(callback, group_id, owner_id, bet_type)
 
@@ -513,7 +551,6 @@ def get_router(ctx: AppContext) -> Router:
 
         bet_date = today_str(ctx.tz)
         refunded = ctx.db.cancel_bets(group_id, owner_id, bet_type, bet_date)
-        invalidate_general_cache(f"bet_pool_card:{group_id}:{bet_type}:{bet_date}")
 
         await callback.answer(f"Ставка отменена, возвращено {refunded} 🪙", show_alert=True)
         await send_bet_pool_menu(callback, group_id, owner_id, bet_type)
@@ -543,8 +580,6 @@ def get_router(ctx: AppContext) -> Router:
             await callback.answer("Эти кнопки только для автора команды.", show_alert=True)
             return
 
-        bet_date = today_str(ctx.tz)
-        invalidate_general_cache(f"bet_pool_card:{group_id}:{bet_type}:{bet_date}")
         await send_bet_pool_menu(callback, group_id, owner_id, bet_type)
         await callback.answer("Обновлено!")
 
@@ -560,7 +595,6 @@ def get_router(ctx: AppContext) -> Router:
         if not await ensure_participant(ctx, message):
             return
         refunded = ctx.db.cancel_bets(message.chat.id, message.from_user.id, "day", today_str(ctx.tz))
-        invalidate_general_cache(f"bet_pool_card:{message.chat.id}:day:{today_str(ctx.tz)}")
         await message.answer(f"Ставки на Дракона Дня отменены, возвращено очков: {refunded}.")
 
     @router.message(Command("cancel_evil"))
@@ -575,7 +609,6 @@ def get_router(ctx: AppContext) -> Router:
         if not await ensure_participant(ctx, message):
             return
         refunded = ctx.db.cancel_bets(message.chat.id, message.from_user.id, "evil", today_str(ctx.tz))
-        invalidate_general_cache(f"bet_pool_card:{message.chat.id}:evil:{today_str(ctx.tz)}")
         await message.answer(f"Ставки на Злого Дракона отменены, возвращено очков: {refunded}.")
 
     @router.message(Command("my_bets"))
@@ -611,11 +644,13 @@ def get_router(ctx: AppContext) -> Router:
                 u_name, f_name, l_name = await resolve_user_display(ctx, message.chat.id, bet["target_user_id"])
                 if u_name or f_name or l_name:
                     username, first_name, last_name = u_name, f_name, l_name
-            name = format_user_name(
-                bet["target_user_id"],
-                username,
-                first_name,
-                last_name,
+            name = html.escape(
+                format_leaderboard_user_name(
+                    bet["target_user_id"],
+                    username,
+                    first_name,
+                    last_name,
+                )
             )
             stats = ctx.db.get_user_stats(message.chat.id, bet["target_user_id"]) or {}
             wins_total = stats.get("wins_day", 0) + stats.get("wins_evil", 0) + stats.get("wins_sleepy", 0)

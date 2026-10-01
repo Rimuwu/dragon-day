@@ -78,11 +78,13 @@ def build_bet_text(
     lines = [title, f"Ваши очки: {points}", "", "Участники:"]
     start_index = page * page_size + 1
     for idx, person in enumerate(participants, start=start_index):
-        name = format_user_name(
-            person["user_id"],
-            person.get("username"),
-            person.get("first_name"),
-            person.get("last_name"),
+        name = html.escape(
+            format_leaderboard_user_name(
+                person["user_id"],
+                person.get("username"),
+                person.get("first_name"),
+                person.get("last_name"),
+            )
         )
         amount = amounts.get(person["user_id"], 0)
         lines.append(f"{idx}. {name} — ставка: {amount}")

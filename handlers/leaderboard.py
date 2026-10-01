@@ -29,11 +29,16 @@ PAGE_SIZE = 10
 def get_router(ctx: AppContext) -> Router:
     router = Router()
 
-    async def get_or_render_podium(group_id: int, kind: str, top_players: list[dict]) -> tuple[bytes, str | None]:
-        cache_key = f"lb_podium:{group_id}:{kind}"
+    async def get_or_render_podium(
+        group_id: int, kind: str, top_players: list[dict]
+    ) -> tuple[bytes, str | None, str]:
+        stat_key = "points" if kind == "points" else f"wins_{kind}"
+        top_hash = ":".join(f"{p['user_id']}_{p.get(stat_key, 0)}" for p in top_players[:3])
+        cache_key = f"lb_podium:{group_id}:{kind}:{top_hash}"
         cached = get_cached_general(cache_key)
         if cached is not None:
-            return cached
+            card_bytes, file_id = cached
+            return card_bytes, file_id, cache_key
 
         # Fetch avatars for top 3 players
         for p in top_players[:3]:
@@ -41,8 +46,9 @@ def get_router(ctx: AppContext) -> Router:
 
         buf = render_leaderboard_podium(top_players[:3], kind=kind)
         card_bytes = buf.getvalue()
-        set_cached_general(cache_key, card_bytes)
-        return card_bytes, None
+        # Cache for 24 hours (auto-invalidated if top 3 users or their scores change)
+        set_cached_general(cache_key, card_bytes, ttl=86400)
+        return card_bytes, None, cache_key
 
     async def send_leaderboard(
         target: Message | CallbackQuery,
@@ -83,8 +89,6 @@ def get_router(ctx: AppContext) -> Router:
         text = build_leaderboard_text(kind, page_items, page, total, PAGE_SIZE)
         keyboard = build_leaderboard_keyboard(group_id, owner_id, kind, page, total, PAGE_SIZE)
 
-        cache_key = f"lb_podium:{group_id}:{kind}"
-
         if isinstance(target, CallbackQuery):
             msg = target.message
             if msg is None:
@@ -92,7 +96,7 @@ def get_router(ctx: AppContext) -> Router:
 
             # If kind changed or message has no photo, update media
             if previous_kind is not None and previous_kind != kind:
-                card_bytes, file_id = await get_or_render_podium(group_id, kind, valid_entries[:3])
+                card_bytes, file_id, cache_key = await get_or_render_podium(group_id, kind, valid_entries[:3])
                 media = file_id if file_id else BufferedInputFile(card_bytes, filename=f"podium_{group_id}_{kind}.png")
                 try:
                     res = await msg.edit_media(
@@ -124,7 +128,7 @@ def get_router(ctx: AppContext) -> Router:
             )
         else:
             # Initial command /leaderboard
-            card_bytes, file_id = await get_or_render_podium(group_id, kind, valid_entries[:3])
+            card_bytes, file_id, cache_key = await get_or_render_podium(group_id, kind, valid_entries[:3])
             sent = None
 
             if file_id:

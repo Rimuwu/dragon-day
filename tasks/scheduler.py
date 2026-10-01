@@ -261,6 +261,7 @@ async def cleanup_loop(ctx: AppContext) -> None:
 
 
 async def lottery_loop(ctx: AppContext) -> None:
+    import html
     from aiogram.types import BufferedInputFile
     from utils.custom_emojis import fmt_emoji
     from utils.helpers import format_user_name
@@ -279,11 +280,13 @@ async def lottery_loop(ctx: AppContext) -> None:
                 if res.get("canceled"):
                     creator_id = res["creator_id"]
                     creator_ident = ctx.db.get_user_identity(group_id, creator_id) or {}
-                    creator_name = format_user_name(
-                        creator_id,
-                        creator_ident.get("username"),
-                        creator_ident.get("first_name"),
-                        creator_ident.get("last_name"),
+                    creator_name = html.escape(
+                        format_user_name(
+                            creator_id,
+                            creator_ident.get("username"),
+                            creator_ident.get("first_name"),
+                            creator_ident.get("last_name"),
+                        )
                     )
                     await ctx.bot.send_message(
                         group_id,
@@ -295,11 +298,13 @@ async def lottery_loop(ctx: AppContext) -> None:
                 else:
                     winner_id = res["winner_id"]
                     winner_ident = ctx.db.get_user_identity(group_id, winner_id) or {}
-                    winner_name = format_user_name(
-                        winner_id,
-                        winner_ident.get("username"),
-                        winner_ident.get("first_name"),
-                        winner_ident.get("last_name"),
+                    winner_name = html.escape(
+                        format_user_name(
+                            winner_id,
+                            winner_ident.get("username"),
+                            winner_ident.get("first_name"),
+                            winner_ident.get("last_name"),
+                        )
                     )
                     winning_ticket = res["winning_ticket"]
                     total_pot = res["total_pot"]

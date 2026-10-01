@@ -68,8 +68,13 @@ def get_cached_avatar(user_id: int) -> Optional[tuple[bool, Optional[bytes]]]:
     return True, data
 
 
-def set_cached_avatar(user_id: int, avatar_bytes: Optional[bytes]) -> None:
-    expires_at = time.time() + CACHE_TTL_SECONDS
+AVATAR_CACHE_TTL_SECONDS = 24 * 3600  # 24 hours
+GENERAL_CACHE_DEFAULT_TTL = 3600  # 1 hour
+
+
+def set_cached_avatar(user_id: int, avatar_bytes: Optional[bytes], ttl: Optional[float] = None) -> None:
+    duration = ttl if ttl is not None else AVATAR_CACHE_TTL_SECONDS
+    expires_at = time.time() + duration
     _AVATAR_CACHE[user_id] = (avatar_bytes, expires_at)
 
 
@@ -92,12 +97,18 @@ def get_cached_general(key: str) -> Optional[tuple[bytes, Optional[str]]]:
     return item.card_bytes, item.file_id
 
 
-def set_cached_general(key: str, card_bytes: bytes, file_id: Optional[str] = None) -> None:
+def set_cached_general(
+    key: str,
+    card_bytes: bytes,
+    file_id: Optional[str] = None,
+    ttl: Optional[float] = None,
+) -> None:
     now = time.time()
     expired = [k for k, v in _GENERAL_CACHE.items() if now >= v.expires_at]
     for k in expired:
         _GENERAL_CACHE.pop(k, None)
-    _GENERAL_CACHE[key] = CardCacheItem(card_bytes, file_id, now + CACHE_TTL_SECONDS)
+    duration = ttl if ttl is not None else GENERAL_CACHE_DEFAULT_TTL
+    _GENERAL_CACHE[key] = CardCacheItem(card_bytes, file_id, now + duration)
 
 
 def update_cached_general_file_id(key: str, file_id: str) -> None:

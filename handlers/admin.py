@@ -1,4 +1,5 @@
 from datetime import datetime
+import html
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
@@ -13,7 +14,7 @@ from aiogram.types import (
 from utils.context import AppContext
 from utils.caption import build_dragon_caption
 from utils.guards import ensure_group_message, ensure_supported_group
-from utils.helpers import format_user_name, compute_coef
+from utils.helpers import compute_coef, format_leaderboard_user_name, format_user_name
 from utils.member import pick_valid_member
 from utils.time_utils import today_str
 
@@ -162,7 +163,7 @@ def get_router(ctx: AppContext) -> Router:
         ]
         keyboard_rows = []
         for idx, u in enumerate(users, start=1):
-            name = format_user_name(u["user_id"], u.get("username"), u.get("first_name"), u.get("last_name"))
+            name = html.escape(format_leaderboard_user_name(u["user_id"], u.get("username"), u.get("first_name"), u.get("last_name")))
             lines.append(f"<b>{idx}.</b> {name} (<code>{u['user_id']}</code>)")
             btn_label = f"❌ Удалить {u['user_id']}"
             keyboard_rows.append([
