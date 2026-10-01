@@ -15,7 +15,7 @@ from utils.card_cache import (
 )
 from utils.context import AppContext
 from utils.guards import ensure_group_message, ensure_participant, ensure_supported_group
-from utils.helpers import format_user_name
+from utils.helpers import format_leaderboard_user_name, format_user_name
 from utils.keyboards import build_leaderboard_keyboard
 from utils.leaderboard_card import render_leaderboard_podium
 from utils.member import resolve_user_display
@@ -67,7 +67,7 @@ def get_router(ctx: AppContext) -> Router:
                 entry["username"] = username
                 entry["first_name"] = first_name
                 entry["last_name"] = last_name
-                entry["display_name"] = format_user_name(
+                entry["display_name"] = format_leaderboard_user_name(
                     entry["user_id"], username, first_name, last_name
                 )
                 valid_entries.append(entry)
@@ -159,7 +159,7 @@ def get_router(ctx: AppContext) -> Router:
                     datetime.now().isoformat(),
                 )
 
-    @router.message(Command("leaderboard"))
+    @router.message(Command("leaderboard", "top"))
     async def cmd_leaderboard(message: Message, command: CommandObject) -> None:
         if not ensure_group_message(message):
             await message.answer("Команда доступна только в группах.")

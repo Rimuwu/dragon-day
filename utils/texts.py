@@ -1,5 +1,7 @@
+import html
+
 from utils.custom_emojis import fmt_emoji
-from utils.helpers import format_user_name
+from utils.helpers import format_leaderboard_user_name, format_user_name
 
 
 def bet_title(bet_type: str) -> str:
@@ -31,11 +33,13 @@ def build_leaderboard_text(kind: str, entries: list[dict], page: int, total: int
     ]
 
     for idx, entry in enumerate(entries, start=start_index):
-        name = format_user_name(
-            entry["user_id"],
-            entry.get("username"),
-            entry.get("first_name"),
-            entry.get("last_name"),
+        name = html.escape(
+            format_leaderboard_user_name(
+                entry["user_id"],
+                entry.get("username"),
+                entry.get("first_name"),
+                entry.get("last_name"),
+            )
         )
         if kind == "points":
             val_formatted = f"{entry['points']:,} {coin_e}".replace(",", " ")

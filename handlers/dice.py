@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+import html
 
 from aiogram import Router
 from aiogram.filters import Command
@@ -7,7 +8,9 @@ from aiogram.types import Message
 
 from utils.card_cache import invalidate_user_cache
 from utils.context import AppContext
+from utils.custom_emojis import fmt_emoji
 from utils.guards import ensure_group_message, ensure_participant, ensure_supported_group
+from utils.helpers import format_user_name
 from utils.time_utils import today_str
 
 
@@ -44,12 +47,12 @@ def get_router(ctx: AppContext) -> Router:
 
         used = ctx.db.check_daily_game_used(message.chat.id, message.from_user.id, game_type, today)
         if used:
-            await message.answer(
+            await message.reply(
                 f"{dice_emoji} Вы уже использовали {cmd_name} сегодня. Приходите завтра!"
             )
             return
 
-        dice_msg = await message.answer_dice(emoji=dice_emoji)
+        dice_msg = await ctx.bot.send_dice(chat_id=message.chat.id, emoji=dice_emoji)
         dice_value = dice_msg.dice.value
 
         points_map = ctx.config.get(config_key, {})
@@ -70,6 +73,14 @@ def get_router(ctx: AppContext) -> Router:
         # Wait for dice animation to complete
         await asyncio.sleep(4.5)
 
+        raw_user_name = format_user_name(
+            message.from_user.id,
+            message.from_user.username,
+            message.from_user.first_name,
+            message.from_user.last_name,
+        )
+        user_name = html.escape(raw_user_name)
+
         points_str = f"+{points}" if points > 0 else str(points)
         streak_note = ""
         if is_max:
@@ -79,11 +90,15 @@ def get_router(ctx: AppContext) -> Router:
             )
 
         sign_word = "очков"
-        await message.answer(
+        coin_e = fmt_emoji("coin", "🪙")
+        result_text = (
             f"{dice_emoji} <b>{game_title}:</b> выпало <b>{dice_value}/{max_val}</b>\n"
-            f"🪙 Вы получаете <b>{points_str} {sign_word}</b>!{streak_note}",
-            parse_mode="HTML",
+            f"{coin_e} <b>{user_name}</b>, вы получаете <b>{points_str} {sign_word}</b>!{streak_note}"
         )
+        try:
+            await dice_msg.reply(result_text, parse_mode="HTML")
+        except Exception:
+            await message.answer(result_text, parse_mode="HTML")
 
     @router.message(Command("roll"))
     async def cmd_roll(message: Message) -> None:

@@ -65,6 +65,32 @@ def format_user_label(
     return f"ID {user_id}"
 
 
+def format_leaderboard_user_name(
+    user_id: int,
+    username: str | None,
+    first_name: str | None,
+    last_name: str | None,
+) -> str:
+    """
+    Форматирует имя пользователя для рейтингов без @-упоминаний:
+    'Имя Фамилия (ник)' или 'Имя (ник)' или 'ник' или 'Имя Фамилия' или 'ID {user_id}'
+    """
+    name_parts = [str(part).strip() for part in [first_name, last_name] if part and str(part).strip()]
+    full_name = " ".join(name_parts) if name_parts else None
+    clean_nick = str(username).strip().lstrip("@") if username and str(username).strip() else None
+
+    if full_name and clean_nick:
+        if full_name.lower() == clean_nick.lower():
+            return full_name
+        return f"{full_name} ({clean_nick})"
+    if full_name:
+        return full_name
+    if clean_nick:
+        return clean_nick
+    return f"ID {user_id}"
+
+
+
 def compute_coef(wins_total: int, config: dict) -> float:
     if wins_total == 0:
         return float(config["bet_coef_new"])
