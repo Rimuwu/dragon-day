@@ -13,6 +13,8 @@ class GroupSettings(Base):
     points_day = Column(Integer, nullable=False, default=100)
     points_evil = Column(Integer, nullable=False, default=-50)
     points_sleepy = Column(Integer, nullable=False, default=120)
+    dragons_topic_id = Column(Integer, nullable=True)
+    commands_topic_id = Column(Integer, nullable=True)
 
 
 class AllowedGroup(Base):

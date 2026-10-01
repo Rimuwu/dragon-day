@@ -1,7 +1,15 @@
 from datetime import datetime
+from typing import Any, Awaitable, Callable
 
+from aiogram import BaseMiddleware
 from aiogram.enums import ChatType
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    TelegramObject,
+)
 
 from utils.context import AppContext
 from utils.helpers import format_user_name
@@ -77,3 +85,61 @@ async def ensure_participant(ctx: AppContext, target: Message | CallbackQuery) -
             datetime.now().isoformat(),
         )
     return False
+
+
+class TopicCommandsMiddleware(BaseMiddleware):
+    def __init__(self, ctx: AppContext):
+        self.ctx = ctx
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        if isinstance(event, Message):
+            if event.chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
+                text = (event.text or event.caption or "").strip()
+                if text.startswith("/"):
+                    cmd = text.split()[0].split("@")[0].lower()
+                    admin_bypass_cmds = {
+                        "/set_bot_topic",
+                        "/bot_topic",
+                        "/set_dragon_topic",
+                        "/dragon_topic",
+                        "/dragons_topic",
+                        "/group_settings",
+                        "/settings",
+                        "/set_time",
+                        "/sleep_time",
+                        "/set_points",
+                        "/add_group",
+                        "/repick",
+                        "/points",
+                    }
+                    if cmd in admin_bypass_cmds:
+                        return await handler(event, data)
+
+                    settings = self.ctx.db.get_group_settings(event.chat.id, self.ctx.config)
+                    commands_topic = settings.get("commands_topic_id")
+                    if commands_topic is not None:
+                        msg_thread = event.message_thread_id
+                        if msg_thread != commands_topic:
+                            return None
+
+        elif isinstance(event, CallbackQuery):
+            if event.message and event.message.chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
+                cb_data = event.data or ""
+                if cb_data.startswith(("cfg_", "join:", "sleepjoin:")):
+                    return await handler(event, data)
+
+                settings = self.ctx.db.get_group_settings(event.message.chat.id, self.ctx.config)
+                commands_topic = settings.get("commands_topic_id")
+                if commands_topic is not None:
+                    msg_thread = event.message.message_thread_id
+                    if msg_thread != commands_topic:
+                        await event.answer()
+                        return None
+
+        return await handler(event, data)
+

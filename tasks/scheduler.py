@@ -27,9 +27,10 @@ async def process_daily(
     today = today_str(ctx.tz)
     if not send_day and not send_evil:
         return
+    dragons_topic_id = settings.get("dragons_topic_id")
     participants = ctx.db.list_participants(group_id)
     if not participants:
-        await ctx.bot.send_message(group_id, "Сегодня нет участников для выбора драконов.")
+        await ctx.bot.send_message(group_id, "Сегодня нет участников для выбора драконов.", message_thread_id=dragons_topic_id)
         return
 
     # 1. Day Dragon: pick from candidate pool
@@ -40,7 +41,7 @@ async def process_daily(
         day_winner = await pick_valid_member(ctx, group_id, participants, "day")
 
     if not day_winner:
-        await ctx.bot.send_message(group_id, "Нет доступных участников в группе.")
+        await ctx.bot.send_message(group_id, "Нет доступных участников в группе.", message_thread_id=dragons_topic_id)
         return
 
     # 2. Evil Dragon: pick from candidate pool (excluding day winner)
@@ -65,7 +66,13 @@ async def process_daily(
         from utils.effects import apply_dragon_effect
         day_effect = apply_dragon_effect(ctx, group_id, "day", day_winner["user_id"], today)
         day_caption = await build_dragon_caption(ctx, group_id, day_winner, "day", settings["points_day"], day_bets, effect=day_effect)
-        await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["day"]), caption=day_caption, parse_mode="HTML")
+        await ctx.bot.send_photo(
+            group_id,
+            FSInputFile(ctx.config["images"]["day"]),
+            caption=day_caption,
+            parse_mode="HTML",
+            message_thread_id=dragons_topic_id,
+        )
 
     if evil_winner and send_evil:
         evil_stats = ctx.db.get_user_stats(group_id, evil_winner["user_id"]) or {}
@@ -81,7 +88,13 @@ async def process_daily(
         from utils.effects import apply_dragon_effect
         evil_effect = apply_dragon_effect(ctx, group_id, "evil", evil_winner["user_id"], today)
         evil_caption = await build_dragon_caption(ctx, group_id, evil_winner, "evil", settings["points_evil"], evil_bets, effect=evil_effect)
-        await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["evil"]), caption=evil_caption, parse_mode="HTML")
+        await ctx.bot.send_photo(
+            group_id,
+            FSInputFile(ctx.config["images"]["evil"]),
+            caption=evil_caption,
+            parse_mode="HTML",
+            message_thread_id=dragons_topic_id,
+        )
 
     ctx.db.set_group_state(
         group_id,
@@ -94,6 +107,8 @@ async def process_daily(
 
 
 async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> None:
+    settings = ctx.db.get_group_settings(group_id, ctx.config)
+    dragons_topic_id = settings.get("dragons_topic_id")
     join_minutes = int(ctx.config["sleep_join_minutes"])
     close_at = datetime.now(ctx.tz) + timedelta(minutes=join_minutes)
     count = ctx.db.count_sleep_entries(group_id, sleep_date)
@@ -102,6 +117,7 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
         group_id,
         f"Ночной дракон открыт! Участвуйте в течение {join_minutes} минут.",
         reply_markup=keyboard,
+        message_thread_id=dragons_topic_id,
     )
     ctx.db.create_sleep_event(group_id, sleep_date, close_at.isoformat(), msg.message_id)
     await asyncio.sleep(join_minutes * 60)
@@ -116,7 +132,11 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
         # Если никто не нажал кнопку — охватываем всех участников чата
         all_participants = ctx.db.list_participants(group_id)
         if not all_participants:
-            await ctx.bot.send_message(group_id, "Никто не участвовал в ночном драконе сегодня.")
+            await ctx.bot.send_message(
+                group_id,
+                "Никто не участвовал в ночном драконе сегодня.",
+                message_thread_id=dragons_topic_id,
+            )
             return
         candidate_dicts = all_participants
     else:
@@ -124,11 +144,14 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
 
     winner_person = await pick_valid_member(ctx, group_id, candidate_dicts, "sleepy")
     if not winner_person:
-        await ctx.bot.send_message(group_id, "Победитель не найден — никто не в группе.")
+        await ctx.bot.send_message(
+            group_id,
+            "Победитель не найден — никто не в группе.",
+            message_thread_id=dragons_topic_id,
+        )
         return
 
     winner_id = winner_person["user_id"]
-    settings = ctx.db.get_group_settings(group_id, ctx.config)
     ctx.db.record_win(group_id, winner_id, "sleepy", settings["points_sleepy"], sleep_date)
     winner_stats = ctx.db.get_user_stats(group_id, winner_id) or {}
     winner_dict = {
@@ -138,7 +161,13 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
         "last_name": winner_stats.get("last_name") or winner_person.get("last_name"),
     }
     caption = await build_dragon_caption(ctx, group_id, winner_dict, "sleepy", settings["points_sleepy"])
-    await ctx.bot.send_photo(group_id, FSInputFile(ctx.config["images"]["sleepy"]), caption=caption, parse_mode="HTML")
+    await ctx.bot.send_photo(
+        group_id,
+        FSInputFile(ctx.config["images"]["sleepy"]),
+        caption=caption,
+        parse_mode="HTML",
+        message_thread_id=dragons_topic_id,
+    )
     ctx.db.clear_sleep_entries(group_id, sleep_date)
 
 

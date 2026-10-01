@@ -85,6 +85,10 @@ class Database:
                 conn.execute(text("ALTER TABLE group_settings ADD COLUMN points_evil INTEGER"))
             if "points_sleepy" not in columns:
                 conn.execute(text("ALTER TABLE group_settings ADD COLUMN points_sleepy INTEGER"))
+            if "dragons_topic_id" not in columns:
+                conn.execute(text("ALTER TABLE group_settings ADD COLUMN dragons_topic_id INTEGER"))
+            if "commands_topic_id" not in columns:
+                conn.execute(text("ALTER TABLE group_settings ADD COLUMN commands_topic_id INTEGER"))
 
     def _ensure_group_state_columns(self) -> None:
         state_cols = [
@@ -215,6 +219,8 @@ class Database:
             "points_day": row.points_day,
             "points_evil": row.points_evil,
             "points_sleepy": row.points_sleepy,
+            "dragons_topic_id": getattr(row, "dragons_topic_id", None),
+            "commands_topic_id": getattr(row, "commands_topic_id", None),
         }
 
     def set_group_time(self, group_id: int, daily_time: str, defaults: dict) -> None:
@@ -244,6 +250,25 @@ class Database:
             row.points_day = points_day
             row.points_evil = points_evil
             row.points_sleepy = points_sleepy
+
+    def set_group_dragons_topic(self, group_id: int, topic_id: int | None, defaults: dict) -> None:
+        self.ensure_group(group_id, defaults)
+        with self._session() as session:
+            row = session.get(GroupSettings, group_id)
+            row.dragons_topic_id = topic_id
+
+    def set_group_commands_topic(self, group_id: int, topic_id: int | None, defaults: dict) -> None:
+        self.ensure_group(group_id, defaults)
+        with self._session() as session:
+            row = session.get(GroupSettings, group_id)
+            row.commands_topic_id = topic_id
+
+    def reset_group_topics(self, group_id: int, defaults: dict) -> None:
+        self.ensure_group(group_id, defaults)
+        with self._session() as session:
+            row = session.get(GroupSettings, group_id)
+            row.dragons_topic_id = None
+            row.commands_topic_id = None
 
     def set_group_state(
         self,

@@ -47,12 +47,12 @@ def get_router(ctx: AppContext) -> Router:
 
         used = ctx.db.check_daily_game_used(message.chat.id, message.from_user.id, game_type, today)
         if used:
-            await message.reply(
+            await message.answer(
                 f"{dice_emoji} Вы уже использовали {cmd_name} сегодня. Приходите завтра!"
             )
             return
 
-        dice_msg = await ctx.bot.send_dice(chat_id=message.chat.id, emoji=dice_emoji)
+        dice_msg = await message.answer_dice(emoji=dice_emoji)
         dice_value = dice_msg.dice.value
 
         points_map = ctx.config.get(config_key, {})
@@ -96,7 +96,11 @@ def get_router(ctx: AppContext) -> Router:
             f"{coin_e} <b>{user_name}</b>, вы получаете <b>{points_str} {sign_word}</b>!{streak_note}"
         )
         try:
-            await dice_msg.reply(result_text, parse_mode="HTML")
+            await dice_msg.reply(
+                result_text,
+                parse_mode="HTML",
+                allow_sending_without_reply=True,
+            )
         except Exception:
             await message.answer(result_text, parse_mode="HTML")
 

@@ -135,7 +135,14 @@ def get_router(ctx: AppContext) -> Router:
         title = "Дракон дня" if bet_type == "day" else "Злой дракон"
         
         image_key = bet_type
-        await ctx.bot.send_photo(message.chat.id, FSInputFile(ctx.config["images"][image_key]), caption=caption, parse_mode="HTML")
+        dragons_topic_id = group_settings.get("dragons_topic_id")
+        await ctx.bot.send_photo(
+            message.chat.id,
+            FSInputFile(ctx.config["images"][image_key]),
+            caption=caption,
+            parse_mode="HTML",
+            message_thread_id=dragons_topic_id,
+        )
         await message.answer(f"Переиграно: {title} — {winner_name}")
 
     def _build_shadow_list_message() -> tuple[str, InlineKeyboardMarkup | None]:

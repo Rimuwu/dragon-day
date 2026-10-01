@@ -41,7 +41,10 @@ async def main() -> None:
 
     dp = Dispatcher()
     from utils.effects import DragonEffectsMiddleware
+    from utils.guards import TopicCommandsMiddleware
     dp.message.outer_middleware(DragonEffectsMiddleware(ctx))
+    dp.message.outer_middleware(TopicCommandsMiddleware(ctx))
+    dp.callback_query.outer_middleware(TopicCommandsMiddleware(ctx))
     for router in get_routers(ctx):
         dp.include_router(router)
 

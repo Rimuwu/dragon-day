@@ -30,6 +30,8 @@ def _build_commands() -> list[BotCommand]:
         BotCommand(command="set_time", description="Время топа (админ группы)"),
         BotCommand(command="sleep_time", description="Окно сна (админ группы)"),
         BotCommand(command="set_points", description="Очки драконов (админ группы)"),
+        BotCommand(command="set_dragon_topic", description="Топик для драконов (админ группы)"),
+        BotCommand(command="set_bot_topic", description="Рабочий топик бота (админ группы)"),
     ]
 
 
@@ -63,10 +65,12 @@ def _build_help_text(is_bot_admin: bool = False) -> str:
         "• <code>/cancel_evil</code> — отменить ставку на злого дракона",
         "",
         "⚙️ <b>Настройки группы (для админов):</b>",
-        "• <code>/group_settings</code> — текущие параметры и расписание",
+        "• <code>/group_settings</code> — текущие параметры, топики и кнопки",
         "• <code>/set_time HH:MM</code> — время выбора дракона дня",
         "• <code>/sleep_time HH:MM-HH:MM</code> — окно сна ночного дракона",
         "• <code>/set_points &lt;день&gt; &lt;злой&gt; &lt;сонный&gt;</code> — награды в очках",
+        "• <code>/set_dragon_topic [reset|ID]</code> — топик для драконов (дня, зла, сна)",
+        "• <code>/set_bot_topic [reset|ID]</code> — рабочий топик бота (только в нем работают команды)",
     ]
 
     if is_bot_admin:

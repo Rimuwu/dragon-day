@@ -18,6 +18,8 @@ class GroupSettingsSchema(BaseModel):
     daily_time: str
     sleep_start: str
     sleep_end: str
+    dragons_topic_id: Optional[int] = None
+    commands_topic_id: Optional[int] = None
 
     class Config:
         from_attributes = True
