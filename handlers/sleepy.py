@@ -5,6 +5,7 @@ from aiogram.types import CallbackQuery
 
 from utils.context import AppContext
 from utils.guards import ensure_participant, ensure_supported_group
+from utils.keyboards import build_sleep_keyboard
 
 
 def get_router(ctx: AppContext) -> Router:
@@ -32,7 +33,20 @@ def get_router(ctx: AppContext) -> Router:
             return
         user = callback.from_user
         ctx.db.upsert_user(group_id, user.id, user.username, user.first_name, user.last_name)
-        ctx.db.add_sleep_entry(group_id, user.id, sleep_date)
+        is_new = ctx.db.add_sleep_entry(group_id, user.id, sleep_date)
+        count = ctx.db.count_sleep_entries(group_id, sleep_date)
+
+        try:
+            await callback.message.edit_reply_markup(
+                reply_markup=build_sleep_keyboard(group_id, sleep_date, count)
+            )
+        except Exception:
+            pass
+
+        if not is_new:
+            await callback.answer("Вы уже участвуете в ночном драконе.")
+            return
+
         await callback.answer("Вы участвуете в ночном драконе.")
 
     return router

@@ -293,19 +293,27 @@ def build_profile_caption(user_data: dict, current_page: str = "wins") -> str:
     ).replace(",", " ")
 
 
+import asyncio
+
 async def fetch_user_avatar(bot, user_id: int) -> bytes | None:
     cached = get_cached_avatar(user_id)
     if cached is not None:
         return cached[1]
     avatar_bytes = None
     try:
-        user_photos = await bot.get_user_profile_photos(user_id, limit=1)
+        user_photos = await asyncio.wait_for(
+            bot.get_user_profile_photos(user_id, limit=1), timeout=1.5
+        )
         if user_photos and user_photos.total_count > 0:
             photo_file = user_photos.photos[0][-1]
-            file_info = await bot.get_file(photo_file.file_id)
+            file_info = await asyncio.wait_for(
+                bot.get_file(photo_file.file_id), timeout=1.5
+            )
             if file_info.file_path:
                 buf = io.BytesIO()
-                await bot.download_file(file_info.file_path, buf)
+                await asyncio.wait_for(
+                    bot.download_file(file_info.file_path, buf), timeout=2.0
+                )
                 avatar_bytes = buf.getvalue()
     except Exception as e:
         logger.debug("Failed to fetch avatar for user %s: %s", user_id, e)

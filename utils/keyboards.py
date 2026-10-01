@@ -105,3 +105,19 @@ def build_bet_keyboard(
     if nav:
         builder.row(*nav)
     return builder.as_markup()
+
+
+def build_sleep_keyboard(group_id: int, sleep_date: str, count: int = 0) -> InlineKeyboardMarkup:
+    sleepy_emoji_id = get_emoji_id("sleepy")
+    btn_text = f"Участвовать ({count})" if sleepy_emoji_id else f"💤 Участвовать ({count})"
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=btn_text,
+                    icon_custom_emoji_id=sleepy_emoji_id,
+                    callback_data=f"sleepjoin:{group_id}:{sleep_date}",
+                )
+            ]
+        ]
+    )

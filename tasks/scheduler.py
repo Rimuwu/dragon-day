@@ -7,16 +7,13 @@ from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarku
 from utils.context import AppContext
 from utils.helpers import compute_coef
 from utils.caption import build_dragon_caption
+from utils.keyboards import build_sleep_keyboard
 from utils.member import pick_valid_member
 from utils.time_utils import parse_range, parse_time_str, pick_random_time, sleep_window_for_date, today_str
 
 
-def _build_sleep_keyboard(group_id: int, sleep_date: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Участвовать", callback_data=f"sleepjoin:{group_id}:{sleep_date}")]
-        ]
-    )
+def _build_sleep_keyboard(group_id: int, sleep_date: str, count: int = 0) -> InlineKeyboardMarkup:
+    return build_sleep_keyboard(group_id, sleep_date, count=count)
 
 
 async def process_daily(
@@ -99,7 +96,8 @@ async def process_daily(
 async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> None:
     join_minutes = int(ctx.config["sleep_join_minutes"])
     close_at = datetime.now(ctx.tz) + timedelta(minutes=join_minutes)
-    keyboard = _build_sleep_keyboard(group_id, sleep_date)
+    count = ctx.db.count_sleep_entries(group_id, sleep_date)
+    keyboard = build_sleep_keyboard(group_id, sleep_date, count)
     msg = await ctx.bot.send_message(
         group_id,
         f"Ночной дракон открыт! Участвуйте в течение {join_minutes} минут.",

@@ -969,11 +969,23 @@ class Database:
             return None
         return {"closes_at": row.closes_at, "message_id": row.message_id}
 
-    def add_sleep_entry(self, group_id: int, user_id: int, sleep_date: str) -> None:
+    def add_sleep_entry(self, group_id: int, user_id: int, sleep_date: str) -> bool:
         with self._session() as session:
             row = session.get(SleepEntry, (group_id, user_id, sleep_date))
             if row is None:
                 session.add(SleepEntry(group_id=group_id, user_id=user_id, sleep_date=sleep_date))
+                return True
+            return False
+
+    def count_sleep_entries(self, group_id: int, sleep_date: str) -> int:
+        with self._session() as session:
+            count = session.scalar(
+                select(func.count(SleepEntry.user_id)).where(
+                    SleepEntry.group_id == group_id,
+                    SleepEntry.sleep_date == sleep_date,
+                )
+            )
+        return int(count or 0)
 
     def get_sleep_entries(self, group_id: int, sleep_date: str) -> list[int]:
         with self._session() as session:
