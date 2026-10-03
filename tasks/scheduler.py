@@ -129,18 +129,14 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
 
     entries = ctx.db.get_sleep_entries(group_id, sleep_date)
     if not entries:
-        # Если никто не нажал кнопку — охватываем всех участников чата
-        all_participants = ctx.db.list_participants(group_id)
-        if not all_participants:
-            await ctx.bot.send_message(
-                group_id,
-                "Никто не участвовал в ночном драконе сегодня.",
-                message_thread_id=dragons_topic_id,
-            )
-            return
-        candidate_dicts = all_participants
-    else:
-        candidate_dicts = [{"user_id": uid} for uid in entries]
+        await ctx.bot.send_message(
+            group_id,
+            "Никто не участвовал в ночном драконе сегодня.",
+            message_thread_id=dragons_topic_id,
+        )
+        return
+
+    candidate_dicts = [{"user_id": uid} for uid in entries]
 
     winner_person = await pick_valid_member(ctx, group_id, candidate_dicts, "sleepy")
     if not winner_person:
@@ -149,6 +145,7 @@ async def process_sleepy(ctx: AppContext, group_id: int, sleep_date: str) -> Non
             "Победитель не найден — никто не в группе.",
             message_thread_id=dragons_topic_id,
         )
+        ctx.db.clear_sleep_entries(group_id, sleep_date)
         return
 
     winner_id = winner_person["user_id"]
